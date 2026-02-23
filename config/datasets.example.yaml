@@ -1,0 +1,8 @@
+bea:
+  source: bea
+  dataset: Regional
+  table_name: SQPCE
+  frequency: A
+  year: ALL
+  line_codes: []
+  geo_scope: states

@@ -1,0 +1,67 @@
+name: Daily BEA Ingest
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+    inputs:
+      env:
+        description: "Target environment"
+        type: choice
+        options: [staging, prod]
+        required: true
+        default: staging
+      smoke:
+        description: "Run smoke mode"
+        type: boolean
+        required: true
+        default: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: ${{ github.event.inputs.env || 'prod' }}
+      LOG_LEVEL: INFO
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      BEA_API_KEY: ${{ secrets.BEA_API_KEY }}
+      S3_DATA_BUCKET: ${{ secrets.S3_DATA_BUCKET }}
+      S3_PREFIX_ROOT: ${{ secrets.S3_PREFIX_ROOT }}
+      PG_HOST: ${{ secrets.PG_HOST }}
+      PG_PORT: ${{ secrets.PG_PORT }}
+      PG_DATABASE: ${{ secrets.PG_DATABASE }}
+      PG_USER: ${{ secrets.PG_USER }}
+      PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+      SNS_ALERT_TOPIC_ARN: ${{ secrets.SNS_ALERT_TOPIC_ARN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+
+      - name: Execute pipeline
+        run: |
+          if [ "${{ github.event.inputs.smoke }}" = "true" ]; then
+            mdi run-all --env "$APP_ENV" --smoke
+          else
+            mdi run-all --env "$APP_ENV"
+          fi
+
+      - name: Upload logs and metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-artifacts
+          path: |
+            logs/**
+            manifests/**
