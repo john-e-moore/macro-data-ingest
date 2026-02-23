@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "macro-data-ingest"
+version = "0.1.0"
+description = "Lightweight BEA PCE-by-state ingestion and warehousing pipeline."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "boto3==1.39.10",
+  "pandas==2.3.1",
+  "pyarrow==21.0.0",
+  "pydantic==2.11.7",
+  "python-dotenv==1.1.1",
+  "PyYAML==6.0.2",
+  "requests==2.32.4",
+  "sqlalchemy==2.0.42",
+  "psycopg[binary]==3.2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.4.1",
+  "ruff==0.12.7",
+]
+
+[project.scripts]
+mdi = "macro_data_ingest.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

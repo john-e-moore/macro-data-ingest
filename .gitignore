@@ -1,6 +1,13 @@
 .env
+.venv/
 *.csv
 *.json
 *.parquet
 *.xlsx
 *pycache*
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+.DS_Store
