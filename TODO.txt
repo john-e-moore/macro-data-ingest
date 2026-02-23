@@ -1,0 +1,4 @@
+1. Get initial data pipeline set up - set up AWS resources, write code, get BEA data into S3 and RDS.
+2. Add Census data.
+3. Connect RDS instance to database tool.
+4. Write SQL for a state-level inflation view.

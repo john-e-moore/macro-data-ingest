@@ -1,0 +1,17 @@
+# Codex project-local configuration for macro-data-ingest.
+#
+# Use this file by launching Codex with:
+#   CODEX_HOME=$(pwd)/.codex codex ...
+#
+# If you want these settings globally for all repositories,
+# copy relevant values into ~/.codex/config.toml instead.
+
+# Include project instruction files that are not at repository root.
+# Codex already checks AGENTS.override.md and AGENTS.md first.
+project_doc_fallback_filenames = [
+  ".agent/AGENTS.md",
+]
+
+# Allow a larger combined instruction chain because this project keeps
+# detailed guidance in .agent/SPEC.md and .agent/PLANS.md references.
+project_doc_max_bytes = 65536
