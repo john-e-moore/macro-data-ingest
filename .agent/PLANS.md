@@ -160,3 +160,99 @@ Use this section to track in-flight plans:
 - `<date> - <plan name> - status: planned|in_progress|blocked|done - owner: <name>`
 
 Keep this index current when running long tasks.
+
+---
+
+# Initial Documentation and Scaffolding
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Create a complete project scaffold that a new contributor can run locally and extend through vertical slices without reworking structure. The immediate observable outcome is a documented repository with a runnable CLI skeleton, workflow skeletons, and module boundaries aligned to the target architecture.
+
+## Progress
+
+- [x] (2026-02-23 00:00Z) Initial planning completed.
+- [x] Documentation scaffold completed.
+- [x] Project/code/workflow skeleton completed.
+- [x] Validation and retrospective updates completed.
+
+## Surprises & Discoveries
+
+- Observation: The repository started nearly empty and required full initial structure creation.
+  Evidence: root contained only `README.md` and `TODO.txt` plus hidden config files.
+
+## Decision Log
+
+- Decision: Use Python package + CLI scaffold with explicit ingest/transform/load module boundaries.
+  Rationale: Matches requirements while keeping implementation lightweight and ready for incremental vertical slices.
+  Date/Author: 2026-02-23, codex agent
+
+## Outcomes & Retrospective
+
+Scaffolded docs, config surfaces, workflow files, package layout, and tests. Functional logic is intentionally deferred to vertical slices to preserve reviewable increments. Validation ran successfully with `make lint test PYTHON=.venv/bin/python` (ruff pass, 2 tests passed).
+
+## Context and Orientation
+
+Key files now include:
+- `src/macro_data_ingest/cli.py` for command entrypoints,
+- `src/macro_data_ingest/ingest/*` for BEA and Bronze boundaries,
+- `src/macro_data_ingest/transforms/*` for Silver/Gold boundaries,
+- `src/macro_data_ingest/load/*` for Postgres boundaries,
+- `scripts/provision_aws.py` for environment provisioning interface,
+- `.github/workflows/*` for CI and daily scheduling,
+- `docs/*` for setup, architecture, operability, and roadmap.
+
+## Plan of Work
+
+1. Establish docs for setup, architecture, requirements, operability, and roadmap.
+2. Create package and CLI scaffolding aligned with required module boundaries.
+3. Add configuration, logging, metadata helpers, and stub stage modules.
+4. Add CI and daily pipeline workflow skeletons.
+5. Add minimal tests validating scaffold wiring and run local checks.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    pip install -e .[dev]
+    make lint
+    make test
+
+Expected outcome: lint and tests pass for scaffolded code.
+
+## Validation and Acceptance
+
+Acceptance checks for this scaffold scope:
+- Documentation exists for setup/architecture/spec/operability/roadmap.
+- CLI command surface exists with staged commands.
+- Required module boundaries exist and import cleanly.
+- CI and schedule workflows are present and syntactically valid.
+- Local lint/tests pass (pending environment execution).
+
+## Idempotence and Recovery
+
+Scaffold files are deterministic and safe to re-apply. If adjustment is needed, edits should be incremental to preserve history and avoid hidden behavior changes.
+
+## Artifacts and Notes
+
+Primary artifacts:
+- `README.md`
+- `docs/*.md`
+- `pyproject.toml`
+- `src/macro_data_ingest/**`
+- `scripts/provision_aws.py`
+- `.github/workflows/*.yml`
+
+## Interfaces and Dependencies
+
+Defined interfaces (stub level):
+- CLI: `mdi ingest|transform|load|run-all`
+- Provisioning: `python scripts/provision_aws.py --env <staging|prod>`
+- Dependencies pinned in `pyproject.toml`.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
