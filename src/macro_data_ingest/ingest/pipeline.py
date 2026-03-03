@@ -56,6 +56,32 @@ def _bea_query(spec: BeaDatasetSpec, smoke: bool) -> BeaQuery:
 def _fetch_payload(
     client: BeaClient, query: BeaQuery, smoke: bool
 ) -> tuple[dict[str, Any], BeaQuery, list[dict[str, Any]]]:
+    if query.line_code.upper() == "ALL":
+        line_codes = client.fetch_line_codes(query.dataset, query.table_name)
+        if smoke:
+            line_codes = line_codes[:3]
+        merged_rows: list[dict[str, Any]] = []
+        base_payload: dict[str, Any] | None = None
+        for line_code in line_codes:
+            candidate = BeaQuery(
+                dataset=query.dataset,
+                table_name=query.table_name,
+                frequency=query.frequency,
+                year=query.year,
+                geo_fips=query.geo_fips,
+                line_code=line_code,
+            )
+            payload = client.fetch(candidate)
+            rows = client.extract_rows(payload)
+            if base_payload is None:
+                base_payload = payload
+            merged_rows.extend(rows)
+        if base_payload is None:
+            raise ValueError("Failed to fetch any payloads for LineCode=ALL expansion.")
+        merged_payload = dict(base_payload)
+        merged_payload.setdefault("BEAAPI", {}).setdefault("Results", {})["Data"] = merged_rows
+        return merged_payload, query, merged_rows
+
     if not smoke:
         payload = client.fetch(query)
         rows = client.extract_rows(payload)
@@ -113,6 +139,12 @@ def run_ingest(
     query = _bea_query(dataset_spec, smoke=smoke)
     client = BeaClient(api_key=config.bea_api_key)
     payload, query, rows = _fetch_payload(client, query, smoke=smoke)
+    if not rows:
+        raise ValueError(
+            "BEA returned zero rows for ingest query "
+            f"dataset={query.dataset} table={query.table_name} year={query.year} "
+            f"geo_fips={query.geo_fips} line_code={query.line_code}."
+        )
     payload_hash = stable_rows_hash(rows)
 
     writer = BronzeWriter(
