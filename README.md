@@ -53,10 +53,14 @@ The CLI exposes pipeline commands:
 - `mdi transform --env staging --run-id <run_id>`
 - `mdi load --env staging --run-id <run_id>`
 - `mdi run-all --env staging --run-id <run_id>`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4`
 
 By default, ingest requests BEA annual years from `BEA_START_YEAR` through current year
 (set in `.env`, default `2000`). `run-all` skips transform/load automatically when the
 ingest payload hash is unchanged.
+
+`run-all` reads `config/datasets.yaml` and processes each enabled dataset. The default config includes
+both `SAPCE3` and `SAPCE4` and requests all line codes/functions.
 
 These commands are implemented end-to-end for staging and can be used in GitHub Actions
 or local runs.

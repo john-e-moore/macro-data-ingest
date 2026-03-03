@@ -11,6 +11,7 @@ import boto3
 import pandas as pd
 
 from macro_data_ingest.config import AppConfig
+from macro_data_ingest.datasets import BeaDatasetSpec
 from macro_data_ingest.load.postgres_loader import PostgresLoader
 from macro_data_ingest.run_metadata import utc_now_iso
 from macro_data_ingest.transforms.gold import to_gold_frame
@@ -75,13 +76,18 @@ def _build_dsn(config: AppConfig) -> str:
     )
 
 
-def run_load(config: AppConfig, run_id: str, smoke: bool = False) -> LoadResult:
+def run_load(
+    config: AppConfig,
+    run_id: str,
+    dataset_spec: BeaDatasetSpec,
+    smoke: bool = False,
+) -> LoadResult:
     del smoke  # reserved for future load variations
     if not config.s3_data_bucket:
         raise ValueError("S3_DATA_BUCKET is required for load.")
 
-    source = "bea"
-    dataset = "pce_state"
+    source = dataset_spec.source
+    dataset = dataset_spec.dataset_id
     extract_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     s3 = boto3.client("s3", region_name=config.aws_region)
 
@@ -105,19 +111,23 @@ def run_load(config: AppConfig, run_id: str, smoke: bool = False) -> LoadResult:
     )
     loader.ensure_base_objects()
     loader.upsert_gold_table(
-        table_name="pce_state_annual",
+        table_name=dataset_spec.target_table,
         frame=gold_frame,
-        pk_cols=["state_fips", "year", "line_code"],
+        pk_cols=["bea_table_name", "state_fips", "year", "line_code"],
     )
     loader.create_or_replace_views()
     loader.record_run(
-        run_id=run_id,
+        run_id=f"{run_id}:{dataset_spec.dataset_id}:load",
         stage="load",
         status="success",
         details={
+            "pipeline_run_id": run_id,
+            "dataset_id": dataset_spec.dataset_id,
+            "storage_dataset": dataset_spec.storage_dataset,
+            "bea_table_name": dataset_spec.bea_table_name,
             "source_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
             "row_count": int(len(gold_frame)),
-            "gold_table": f"{config.pg_schema_gold}.pce_state_annual",
+            "gold_table": f"{config.pg_schema_gold}.{dataset_spec.target_table}",
             "loaded_at_utc": utc_now_iso(),
         },
     )
@@ -128,10 +138,13 @@ def run_load(config: AppConfig, run_id: str, smoke: bool = False) -> LoadResult:
         "stage": "load",
         "source": source,
         "dataset": dataset,
+        "dataset_id": dataset_spec.dataset_id,
+        "storage_dataset": dataset_spec.storage_dataset,
+        "bea_table_name": dataset_spec.bea_table_name,
         "extracted_at_utc": utc_now_iso(),
         "input_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
         "row_count": int(len(gold_frame)),
-        "target_table": f"{config.pg_schema_gold}.pce_state_annual",
+        "target_table": f"{config.pg_schema_gold}.{dataset_spec.target_table}",
         "target_view": "serving.v_pce_state_yoy",
     }
     manifest_key = (
@@ -144,6 +157,6 @@ def run_load(config: AppConfig, run_id: str, smoke: bool = False) -> LoadResult:
         run_id=run_id,
         row_count=int(len(gold_frame)),
         source_silver_uri=f"s3://{config.s3_data_bucket}/{silver_key}",
-        gold_table=f"{config.pg_schema_gold}.pce_state_annual",
+        gold_table=f"{config.pg_schema_gold}.{dataset_spec.target_table}",
         manifest_uri=manifest_uri,
     )

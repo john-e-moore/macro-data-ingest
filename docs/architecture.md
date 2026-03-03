@@ -18,7 +18,7 @@ Orchestration is handled by GitHub Actions on a daily schedule plus manual dispa
 - **Silver**
   - Stable schemas and typed columns
   - Normalized keys for geography/time/category
-  - Current slice keeps state + DC rows with keys: `state_fips`, `state_abbrev`, `year`, `line_code`
+  - Current slice keeps state + DC rows with keys: `bea_table_name`, `state_fips`, `state_abbrev`, `year`, `line_code`
 - **Gold**
   - Consumer-friendly facts/aggregates suitable for BI and SQL analysis
 
@@ -73,3 +73,13 @@ Each run persists:
 - output partitions generated
 
 Lineage is written to both S3 manifests and Postgres metadata tables.
+
+## Multi-table Daily Ingest
+
+Dataset definitions are kept in `config/datasets.yaml`. Each enabled entry controls:
+- BEA table (`bea_table_name`)
+- query shape (`line_code`, `geo_fips`, frequency, start year)
+- storage identity (`dataset_id`)
+- Postgres target table
+
+Daily runs iterate all enabled datasets, so adding a BEA table is config-first.

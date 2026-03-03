@@ -69,7 +69,7 @@ def _parse_line_code(series_code: str) -> str:
     return series_code
 
 
-def to_silver_frame(raw_payload: dict) -> pd.DataFrame:
+def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.DataFrame:
     """Convert raw BEA payload into typed Silver records for state-level rows."""
     rows = raw_payload.get("BEAAPI", {}).get("Results", {}).get("Data", [])
     if not rows:
@@ -79,6 +79,7 @@ def to_silver_frame(raw_payload: dict) -> pd.DataFrame:
                 "state_abbrev",
                 "geo_name",
                 "year",
+                "bea_table_name",
                 "line_code",
                 "series_code",
                 "value",
@@ -96,6 +97,10 @@ def to_silver_frame(raw_payload: dict) -> pd.DataFrame:
 
     frame["year"] = pd.to_numeric(frame["TimePeriod"], errors="coerce").astype("Int64")
     frame["line_code"] = frame["Code"].astype(str).map(_parse_line_code)
+    if bea_table_name is not None:
+        frame["bea_table_name"] = str(bea_table_name).strip().upper()
+    else:
+        frame["bea_table_name"] = frame["Code"].astype(str).str.split("-", n=1).str[0].str.upper()
     frame["value"] = pd.to_numeric(frame["DataValue"].astype(str).str.replace(",", ""), errors="coerce")
     frame["unit_mult"] = pd.to_numeric(frame["UNIT_MULT"], errors="coerce").fillna(0).astype(int)
 
@@ -105,6 +110,7 @@ def to_silver_frame(raw_payload: dict) -> pd.DataFrame:
             "state_abbrev",
             "GeoName",
             "year",
+            "bea_table_name",
             "line_code",
             "Code",
             "value",
@@ -120,7 +126,9 @@ def to_silver_frame(raw_payload: dict) -> pd.DataFrame:
             "NoteRef": "note_ref",
         }
     )
-    silver = silver.sort_values(["year", "state_fips", "line_code"]).reset_index(drop=True)
+    silver = silver.sort_values(
+        ["bea_table_name", "year", "state_fips", "line_code"]
+    ).reset_index(drop=True)
     return silver
 
 
@@ -128,12 +136,19 @@ def validate_silver_frame(frame: pd.DataFrame) -> None:
     if frame.empty:
         raise ValueError("Silver frame is empty.")
 
-    required_not_null = ["state_fips", "state_abbrev", "year", "line_code", "value"]
+    required_not_null = [
+        "state_fips",
+        "state_abbrev",
+        "year",
+        "bea_table_name",
+        "line_code",
+        "value",
+    ]
     null_counts = frame[required_not_null].isnull().sum()
     bad_cols = [col for col, count in null_counts.items() if count > 0]
     if bad_cols:
         raise ValueError(f"Silver frame has nulls in required columns: {bad_cols}")
 
-    dupes = frame.duplicated(subset=["state_fips", "year", "line_code"]).sum()
+    dupes = frame.duplicated(subset=["bea_table_name", "state_fips", "year", "line_code"]).sum()
     if dupes > 0:
         raise ValueError(f"Silver frame has duplicate primary keys: {dupes}")

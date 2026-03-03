@@ -46,6 +46,7 @@ Do not commit real values.
 - `BEA_TABLE_NAME=SAPCE3`
 - `BEA_FREQUENCY=A`
 - `BEA_START_YEAR=2000`
+- `DATASETS_CONFIG_PATH=config/datasets.yaml`
 - `PG_HOST=example.rds.amazonaws.com`
 - `PG_PORT=5432`
 - `PG_DATABASE=macro`
@@ -103,6 +104,9 @@ Recommended optional secrets (override defaults when needed):
 - `BEA_TABLE_NAME` (default `SAPCE3`)
 - `BEA_FREQUENCY` (default `A`)
 - `BEA_START_YEAR` (default `2000`; ingestion requests this year through current year)
+
+`config/datasets.yaml` is the canonical source for multi-table daily runs. By default it includes
+`SAPCE3` and `SAPCE4` with `line_code: ALL`, so all SAPCE4 functions are ingested on each run.
 
 ## Rollback / Cleanup Guidance (Manual)
 

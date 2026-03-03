@@ -10,6 +10,7 @@ def to_gold_frame(silver_frame: pd.DataFrame) -> pd.DataFrame:
         "state_abbrev",
         "geo_name",
         "year",
+        "bea_table_name",
         "line_code",
         "series_code",
         "value",
@@ -26,5 +27,7 @@ def to_gold_frame(silver_frame: pd.DataFrame) -> pd.DataFrame:
     gold["pce_value"] = pd.to_numeric(gold["value"], errors="coerce")
     gold["pce_value_scaled"] = gold["pce_value"] * (10 ** gold["unit_mult"])
     gold = gold.drop(columns=["value"])
-    gold = gold.sort_values(["year", "state_fips", "line_code"]).reset_index(drop=True)
+    gold = gold.sort_values(["bea_table_name", "year", "state_fips", "line_code"]).reset_index(
+        drop=True
+    )
     return gold

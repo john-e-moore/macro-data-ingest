@@ -21,6 +21,12 @@ def test_extract_rows_reads_bea_results_data() -> None:
     assert rows[0]["TimePeriod"] == "2024"
 
 
+def test_build_params_omits_line_code_for_all() -> None:
+    client = BeaClient(api_key="abc-123")
+    params = client._build_params(BeaQuery(dataset="Regional", table_name="SAPCE4", line_code="ALL"))
+    assert "LineCode" not in params
+
+
 def test_fetch_raises_when_bea_error() -> None:
     class DummyResponse:
         def raise_for_status(self) -> None:

@@ -11,6 +11,7 @@ import boto3
 import pandas as pd
 
 from macro_data_ingest.config import AppConfig
+from macro_data_ingest.datasets import BeaDatasetSpec
 from macro_data_ingest.run_metadata import utc_now_iso
 from macro_data_ingest.transforms.silver import to_silver_frame, validate_silver_frame
 
@@ -75,13 +76,18 @@ def _write_json_to_s3(s3_client: Any, bucket: str, key: str, payload: dict[str, 
     return f"s3://{bucket}/{key}"
 
 
-def run_transform(config: AppConfig, run_id: str, smoke: bool = False) -> TransformResult:
+def run_transform(
+    config: AppConfig,
+    run_id: str,
+    dataset_spec: BeaDatasetSpec,
+    smoke: bool = False,
+) -> TransformResult:
     del smoke  # reserved for future parameterized transforms
     if not config.s3_data_bucket:
         raise ValueError("S3_DATA_BUCKET is required for transform.")
 
-    source = "bea"
-    dataset = "pce_state"
+    source = dataset_spec.source
+    dataset = dataset_spec.dataset_id
     extract_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     s3 = boto3.client("s3", region_name=config.aws_region)
@@ -94,7 +100,7 @@ def run_transform(config: AppConfig, run_id: str, smoke: bool = False) -> Transf
     )
     payload = _read_json_from_s3(s3, config.s3_data_bucket, payload_key)
 
-    silver_frame = to_silver_frame(payload)
+    silver_frame = to_silver_frame(payload, bea_table_name=dataset_spec.bea_table_name)
     validate_silver_frame(silver_frame)
 
     silver_key = (
@@ -109,6 +115,9 @@ def run_transform(config: AppConfig, run_id: str, smoke: bool = False) -> Transf
         "stage": "transform",
         "source": source,
         "dataset": dataset,
+        "dataset_id": dataset_spec.dataset_id,
+        "storage_dataset": dataset_spec.storage_dataset,
+        "bea_table_name": dataset_spec.bea_table_name,
         "extracted_at_utc": utc_now_iso(),
         "input_payload_uri": f"s3://{config.s3_data_bucket}/{payload_key}",
         "row_count": int(len(silver_frame)),

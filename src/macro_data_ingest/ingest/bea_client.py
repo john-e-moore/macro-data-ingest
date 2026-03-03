@@ -13,7 +13,7 @@ class BeaQuery:
     frequency: str = "A"
     year: str = "ALL"
     geo_fips: str = "STATE"
-    line_code: str = "1"
+    line_code: str = "ALL"
 
 
 class BeaClient:
@@ -27,7 +27,7 @@ class BeaClient:
         self._session = requests.Session()
 
     def _build_params(self, query: BeaQuery) -> dict[str, str]:
-        return {
+        params = {
             "UserID": self.api_key,
             "method": "GetData",
             "datasetname": query.dataset,
@@ -35,9 +35,12 @@ class BeaClient:
             "Frequency": query.frequency,
             "Year": query.year,
             "GeoFips": query.geo_fips,
-            "LineCode": query.line_code,
             "ResultFormat": "JSON",
         }
+        # Some BEA tables support all rows when LineCode is omitted.
+        if query.line_code.upper() != "ALL":
+            params["LineCode"] = query.line_code
+        return params
 
     def fetch(self, query: BeaQuery) -> dict[str, Any]:
         response = self._session.get(
