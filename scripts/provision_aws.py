@@ -200,8 +200,13 @@ class AwsProvisioner:
             "Statement": [
                 {
                     "Effect": "Allow",
-                    "Principal": {"AWS": f"arn:aws:iam::{account_id}:role/{self.plan.gha_role_name}"},
+                    "Principal": {"AWS": f"arn:aws:iam::{account_id}:root"},
                     "Action": "sts:AssumeRole",
+                    "Condition": {
+                        "ArnLike": {
+                            "aws:PrincipalArn": f"arn:aws:iam::{account_id}:role/{self.plan.gha_role_name}"
+                        }
+                    },
                 }
             ],
         }

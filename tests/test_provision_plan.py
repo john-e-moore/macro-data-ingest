@@ -11,6 +11,9 @@ def test_build_plan_uses_env_suffix(monkeypatch) -> None:
     monkeypatch.setenv("AWS_ACCOUNT_ID", "123456789012")
     monkeypatch.setenv("PG_INSTANCE_CLASS", "db.t4g.micro")
     monkeypatch.setenv("PG_ALLOCATED_STORAGE", "20")
+    monkeypatch.setenv("S3_DATA_BUCKET", "")
+    monkeypatch.setenv("S3_LOG_BUCKET", "")
+    monkeypatch.setenv("GITHUB_REPO", "org/repo")
 
     plan = build_plan("staging")
 

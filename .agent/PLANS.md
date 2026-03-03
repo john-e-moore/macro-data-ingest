@@ -272,12 +272,14 @@ Implement a real, idempotent AWS provisioning path that supports both `staging` 
 - [x] (2026-02-23 00:00Z) Initial planning completed.
 - [x] Provisioning implementation milestone completed.
 - [x] Local validation and documentation updates completed.
-- [ ] Live AWS apply validation pending user credentials.
+- [x] Live AWS apply validation completed for staging (resources created; RDS in `creating` state).
 
 ## Surprises & Discoveries
 
 - Observation: Existing `.env` did not yet contain required AWS networking fields for RDS provisioning.
   Evidence: `AWS_VPC_ID` and `AWS_PRIVATE_SUBNET_IDS` were absent prior to `.env.template` update.
+- Observation: Initial runtime role trust policy failed with `MalformedPolicyDocument` due principal reference timing/validation.
+  Evidence: AWS returned `Invalid principal in policy` for `arn:aws:iam::<account>:role/tlg-macro-staging-gha-role`.
 
 ## Decision Log
 
@@ -291,7 +293,7 @@ Implement a real, idempotent AWS provisioning path that supports both `staging` 
 
 ## Outcomes & Retrospective
 
-`scripts/provision_aws.py` now performs a real provisioning flow in apply mode (S3, IAM, CloudWatch, SNS, RDS/security-group/subnet-group) with idempotent checks. A plan-only mode prints resource names/outputs safely without mutations. Unit tests cover planning and normalization helpers. Live apply is intentionally deferred until user-provided credentials are in place.
+`scripts/provision_aws.py` now performs a real provisioning flow in apply mode (S3, IAM, CloudWatch, SNS, RDS/security-group/subnet-group) with idempotent checks. A plan-only mode prints resource names/outputs safely without mutations. Unit tests cover planning and normalization helpers. Staging apply has been executed successfully; supporting resources exist and RDS is provisioning.
 
 ## Context and Orientation
 
@@ -347,6 +349,10 @@ Artifacts:
 - `docs/setup.md`
 - `.env.template`
 
+Evidence snapshot:
+- apply actions reported created/reused staging resources;
+- follow-up check with `.env` credentials shows `tlg-macro-staging-pg` status `creating`.
+
 ## Interfaces and Dependencies
 
 Interfaces:
@@ -361,4 +367,4 @@ Dependencies:
 ## Optional: Active ExecPlan Index
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
-- `2026-02-23 - AWS Provisioning Vertical Slice A - status: in_progress (awaiting live apply) - owner: codex agent`
+- `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
