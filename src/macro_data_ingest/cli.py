@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import uuid
 
 from macro_data_ingest.config import load_config
+from macro_data_ingest.ingest.pipeline import run_ingest
 from macro_data_ingest.logging_utils import configure_logging
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _base_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="mdi", description="Macro Data Ingest CLI")
+    parser = argparse.ArgumentParser(prog="mdi", description="Macro Data Ingest CLI", add_help=False)
     parser.add_argument("--env", default="staging", choices=["staging", "prod"])
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--smoke", action="store_true", help="Use tiny pull and reduced workload.")
@@ -20,8 +24,19 @@ def _resolve_run_id(run_id: str | None) -> str:
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
+    config = load_config()
     run_id = _resolve_run_id(args.run_id)
-    print(f"[SCAFFOLD] ingest env={args.env} run_id={run_id} smoke={args.smoke}")
+    try:
+        result = run_ingest(config=config, run_id=run_id, smoke=args.smoke)
+    except Exception:
+        LOGGER.exception("ingest failed", extra={"run_id": run_id, "stage": "ingest"})
+        return 1
+
+    print(
+        "ingest completed "
+        f"run_id={result.run_id} changed={result.changed} "
+        f"rows={result.row_count} manifest={result.manifest_uri}"
+    )
     return 0
 
 

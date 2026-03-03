@@ -52,7 +52,7 @@ def load_config() -> AppConfig:
         github_repo=os.getenv("GITHUB_REPO", ""),
         bea_api_key=os.getenv("BEA_API_KEY", ""),
         bea_dataset=os.getenv("BEA_DATASET", "Regional"),
-        bea_table_name=os.getenv("BEA_TABLE_NAME", "SQPCE"),
+        bea_table_name=os.getenv("BEA_TABLE_NAME", "SAPCE3"),
         bea_frequency=os.getenv("BEA_FREQUENCY", "A"),
         pg_host=os.getenv("PG_HOST", ""),
         pg_port=int(os.getenv("PG_PORT", "5432")),

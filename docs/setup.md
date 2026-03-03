@@ -41,8 +41,8 @@ Do not commit real values.
 - `S3_LOG_BUCKET=tlg-macro-data-access-logs`
 - `GITHUB_REPO=your-org/macro-data-ingest`
 - `BEA_API_KEY=example`
-- `BEA_DATASET=NIPA`
-- `BEA_TABLE_NAME=SQPCE`
+- `BEA_DATASET=Regional`
+- `BEA_TABLE_NAME=SAPCE3`
 - `BEA_FREQUENCY=A`
 - `PG_HOST=example.rds.amazonaws.com`
 - `PG_PORT=5432`

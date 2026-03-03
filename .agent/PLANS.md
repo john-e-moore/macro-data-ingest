@@ -368,3 +368,118 @@ Dependencies:
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
 - `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
+
+---
+
+# BEA Ingest to Bronze Vertical Slice B
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Implement a real ingestion path from BEA API to S3 Bronze with run manifests and hash-based change detection so daily jobs can skip unchanged payload rewrites while preserving run-level lineage.
+
+## Progress
+
+- [x] (2026-03-03 00:00Z) Initial planning completed.
+- [x] Ingestion implementation milestone completed.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: default table value `SQPCE` did not work with Regional dataset in this environment.
+  Evidence: BEA API returned `Invalid Value for Parameter TableName`.
+- Observation: smoke mode using current year returned zero rows due data availability lag.
+  Evidence: first smoke run returned `rows=0`; fallback-year strategy returned `rows=60`.
+
+## Decision Log
+
+- Decision: Use `SAPCE3` as default BEA table name for state-level PCE by type.
+  Rationale: Valid Regional table and aligned to project scope.
+  Date/Author: 2026-03-03, codex agent
+- Decision: Always write run manifest and checkpoint, but write raw payload only when hash changes.
+  Rationale: Preserves lineage while avoiding unnecessary raw rewrites.
+  Date/Author: 2026-03-03, codex agent
+
+## Outcomes & Retrospective
+
+`mdi ingest` now performs a full BEA->Bronze flow with idempotent change detection. A real smoke run succeeded against staging and a second rerun showed no-op raw write behavior (`changed=False`) while still recording a manifest.
+
+## Context and Orientation
+
+Key files for this slice:
+- `src/macro_data_ingest/ingest/bea_client.py` for API request/response handling,
+- `src/macro_data_ingest/ingest/bronze_writer.py` for S3 payload/manifest/checkpoint operations,
+- `src/macro_data_ingest/ingest/pipeline.py` for ingest orchestration and hash checkpoint logic,
+- `src/macro_data_ingest/cli.py` for CLI wiring and run output,
+- `tests/test_bea_client.py` and `tests/test_ingest_pipeline.py` for unit coverage.
+
+## Plan of Work
+
+1. Implement BEA client request/validation behavior.
+2. Implement S3 Bronze writer with deterministic key layout.
+3. Implement ingest orchestration with hash checkpoint comparison.
+4. Wire `mdi ingest` to execute orchestrator.
+5. Add/expand tests and run smoke validation against staging.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    BEA_TABLE_NAME=SAPCE3 .venv/bin/mdi ingest --env staging --smoke
+    BEA_TABLE_NAME=SAPCE3 .venv/bin/mdi ingest --env staging --smoke
+
+Expected outcomes:
+- lint/tests pass;
+- first ingest writes raw payload (`changed=True`);
+- second ingest skips raw payload rewrite (`changed=False`) and writes manifest.
+
+## Validation and Acceptance
+
+Acceptance checks achieved:
+- BEA API call is implemented and validates error payloads.
+- Bronze payloads are stored under deterministic partitioned keys.
+- Run manifests are written per run with request params/hash/row counts.
+- Checkpoint hash is persisted and used for change detection on reruns.
+- Unit tests pass and staging smoke run demonstrates idempotent behavior.
+
+## Idempotence and Recovery
+
+Idempotence:
+- On matching payload hash, raw payload write is skipped.
+- Manifest/checkpoint are still updated for run traceability.
+
+Recovery:
+- Re-run `mdi ingest` with same parameters after transient failures; unchanged payload path no-ops raw writes.
+
+## Artifacts and Notes
+
+Artifacts:
+- `src/macro_data_ingest/ingest/bea_client.py`
+- `src/macro_data_ingest/ingest/bronze_writer.py`
+- `src/macro_data_ingest/ingest/pipeline.py`
+- `src/macro_data_ingest/cli.py`
+- `tests/test_bea_client.py`
+- `tests/test_ingest_pipeline.py`
+
+Evidence snapshot:
+- `make lint test PYTHON=.venv/bin/python` -> pass (`10 passed`);
+- smoke ingest run wrote Bronze payload and manifest;
+- immediate rerun reported `changed=False` with skipped raw write.
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `mdi ingest --env <staging|prod> [--smoke] [--run-id <id>]`
+
+Dependencies:
+- `requests` for BEA API calls.
+- `boto3` for S3 checkpoint/payload/manifest writes.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
+- `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
+- `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
