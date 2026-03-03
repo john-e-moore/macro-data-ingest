@@ -1,0 +1,42 @@
+from pathlib import Path
+
+import pytest
+
+from macro_data_ingest.config import load_config
+from macro_data_ingest.datasets import load_dataset_specs
+
+
+def test_load_dataset_specs_from_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    config_path = tmp_path / "datasets.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "datasets:",
+                "  - dataset_id: pce_state_sapce4",
+                "    bea_table_name: SAPCE4",
+                "    bea_dataset: Regional",
+                "    bea_frequency: A",
+                "    bea_start_year: 2000",
+                "    line_code: ALL",
+                "    geo_fips: STATE",
+                "    target_table: pce_state_annual",
+                "    enabled: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DATASETS_CONFIG_PATH", str(config_path))
+    cfg = load_config()
+    specs = load_dataset_specs(cfg)
+    assert len(specs) == 1
+    assert specs[0].dataset_id == "pce_state_sapce4"
+    assert specs[0].bea_table_name == "SAPCE4"
+
+
+def test_load_dataset_specs_legacy_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATASETS_CONFIG_PATH", "config/not-real.yaml")
+    monkeypatch.setenv("BEA_TABLE_NAME", "SAPCE3")
+    cfg = load_config()
+    specs = load_dataset_specs(cfg)
+    assert len(specs) == 1
+    assert specs[0].dataset_id == "pce_state_sapce3"

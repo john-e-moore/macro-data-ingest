@@ -24,6 +24,7 @@ class AppConfig:
     bea_table_name: str
     bea_frequency: str
     bea_start_year: int
+    datasets_config_path: str
     pg_host: str
     pg_port: int
     pg_database: str
@@ -56,6 +57,7 @@ def load_config() -> AppConfig:
         bea_table_name=os.getenv("BEA_TABLE_NAME", "SAPCE3"),
         bea_frequency=os.getenv("BEA_FREQUENCY", "A"),
         bea_start_year=int(os.getenv("BEA_START_YEAR", "2000")),
+        datasets_config_path=os.getenv("DATASETS_CONFIG_PATH", "config/datasets.yaml"),
         pg_host=os.getenv("PG_HOST", ""),
         pg_port=int(os.getenv("PG_PORT", "5432")),
         pg_database=os.getenv("PG_DATABASE", "macro"),

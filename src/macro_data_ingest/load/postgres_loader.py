@@ -44,6 +44,7 @@ class PostgresLoader:
         );
 
         CREATE TABLE IF NOT EXISTS {schema_gold}.pce_state_annual (
+            bea_table_name TEXT NOT NULL,
             state_fips TEXT NOT NULL,
             state_abbrev TEXT NOT NULL,
             geo_name TEXT NOT NULL,
@@ -57,11 +58,65 @@ class PostgresLoader:
             note_ref TEXT NULL,
             run_id TEXT NOT NULL,
             loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (state_fips, year, line_code)
+            PRIMARY KEY (bea_table_name, state_fips, year, line_code)
         );
         """
         with self.engine.begin() as conn:
             conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ADD COLUMN IF NOT EXISTS bea_table_name TEXT;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    UPDATE {schema_gold}.pce_state_annual
+                    SET bea_table_name = split_part(series_code, '-', 1)
+                    WHERE bea_table_name IS NULL;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ALTER COLUMN bea_table_name SET NOT NULL;
+                    """
+                )
+            )
+            pk_name = conn.execute(
+                text(
+                    """
+                    SELECT conname
+                    FROM pg_constraint
+                    WHERE conrelid = to_regclass(:full_table_name)
+                      AND contype = 'p'
+                    """
+                ),
+                {"full_table_name": f"{schema_gold}.pce_state_annual"},
+            ).scalar()
+            if pk_name:
+                conn.execute(
+                    text(
+                        f"""
+                        ALTER TABLE {schema_gold}.pce_state_annual
+                        DROP CONSTRAINT IF EXISTS {pk_name};
+                        """
+                    )
+                )
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ADD CONSTRAINT pce_state_annual_pkey PRIMARY KEY
+                    (bea_table_name, state_fips, year, line_code);
+                    """
+                )
+            )
 
     def upsert_gold_table(self, table_name: str, frame: pd.DataFrame, pk_cols: list[str]) -> None:
         if frame.empty:
@@ -100,6 +155,7 @@ class PostgresLoader:
         view_sql = f"""
         CREATE OR REPLACE VIEW {schema_serving}.v_pce_state_yoy AS
         SELECT
+            cur.bea_table_name,
             cur.state_fips,
             cur.state_abbrev,
             cur.geo_name,
@@ -113,7 +169,8 @@ class PostgresLoader:
             END AS yoy_pct
         FROM {schema_gold}.pce_state_annual cur
         LEFT JOIN {schema_gold}.pce_state_annual prev
-            ON cur.state_fips = prev.state_fips
+            ON cur.bea_table_name = prev.bea_table_name
+           AND cur.state_fips = prev.state_fips
            AND cur.line_code = prev.line_code
            AND cur.year = prev.year + 1;
         """

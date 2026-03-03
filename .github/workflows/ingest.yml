@@ -37,6 +37,7 @@ jobs:
       BEA_API_KEY: ${{ secrets.BEA_API_KEY }}
       S3_DATA_BUCKET: ${{ secrets.S3_DATA_BUCKET }}
       S3_PREFIX_ROOT: ${{ secrets.S3_PREFIX_ROOT }}
+      DATASETS_CONFIG_PATH: config/datasets.yaml
       PG_HOST: ${{ secrets.PG_HOST }}
       PG_PORT: ${{ secrets.PG_PORT }}
       PG_DATABASE: ${{ secrets.PG_DATABASE }}

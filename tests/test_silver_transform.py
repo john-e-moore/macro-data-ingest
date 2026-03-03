@@ -50,6 +50,7 @@ def test_to_silver_frame_keeps_only_state_rows() -> None:
     assert len(silver) == 1
     assert silver.iloc[0]["state_abbrev"] == "AL"
     assert silver.iloc[0]["line_code"] == "1"
+    assert silver.iloc[0]["bea_table_name"] == "SAPCE3"
 
 
 def test_validate_silver_frame_happy_path() -> None:
@@ -65,6 +66,7 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
                 "state_abbrev": "AL",
                 "geo_name": "Alabama",
                 "year": 2024,
+                "bea_table_name": "SAPCE3",
                 "line_code": "1",
                 "series_code": "SAPCE3-1",
                 "value": 1.0,
@@ -77,6 +79,7 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
                 "state_abbrev": "AL",
                 "geo_name": "Alabama",
                 "year": 2024,
+                "bea_table_name": "SAPCE3",
                 "line_code": "1",
                 "series_code": "SAPCE3-1",
                 "value": 2.0,
@@ -89,3 +92,8 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
 
     with pytest.raises(ValueError):
         validate_silver_frame(frame)
+
+
+def test_to_silver_frame_allows_explicit_table_name() -> None:
+    silver = to_silver_frame(_sample_payload(), bea_table_name="sapce4")
+    assert set(silver["bea_table_name"].unique()) == {"SAPCE4"}

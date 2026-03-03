@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from macro_data_ingest.config import AppConfig
+from macro_data_ingest.datasets import BeaDatasetSpec
 from macro_data_ingest.ingest.bea_client import BeaClient, BeaQuery
 from macro_data_ingest.ingest.bronze_writer import BronzeWriter
 from macro_data_ingest.run_metadata import RunManifest, stable_rows_hash, utc_now_iso
@@ -40,15 +41,15 @@ def _year_range(start_year: int) -> str:
     return ",".join(years)
 
 
-def _bea_query(config: AppConfig, smoke: bool) -> BeaQuery:
-    year = _smoke_year() if smoke else _year_range(config.bea_start_year)
+def _bea_query(spec: BeaDatasetSpec, smoke: bool) -> BeaQuery:
+    year = _smoke_year() if smoke else _year_range(spec.bea_start_year)
     return BeaQuery(
-        dataset=config.bea_dataset,
-        table_name=config.bea_table_name,
-        frequency=config.bea_frequency,
+        dataset=spec.bea_dataset,
+        table_name=spec.bea_table_name,
+        frequency=spec.bea_frequency,
         year=year,
-        geo_fips="STATE",
-        line_code="1",
+        geo_fips=spec.geo_fips,
+        line_code=spec.line_code,
     )
 
 
@@ -94,17 +95,22 @@ def _source_release_tag(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def run_ingest(config: AppConfig, run_id: str, smoke: bool = False) -> IngestResult:
+def run_ingest(
+    config: AppConfig,
+    run_id: str,
+    dataset_spec: BeaDatasetSpec,
+    smoke: bool = False,
+) -> IngestResult:
     if not config.bea_api_key:
         raise ValueError("BEA_API_KEY is required for ingest.")
     if not config.s3_data_bucket:
         raise ValueError("S3_DATA_BUCKET is required for ingest.")
 
-    source = "bea"
-    dataset = "pce_state"
+    source = dataset_spec.source
+    dataset = dataset_spec.dataset_id
     extract_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    query = _bea_query(config, smoke=smoke)
+    query = _bea_query(dataset_spec, smoke=smoke)
     client = BeaClient(api_key=config.bea_api_key)
     payload, query, rows = _fetch_payload(client, query, smoke=smoke)
     payload_hash = stable_rows_hash(rows)
@@ -172,6 +178,9 @@ def run_ingest(config: AppConfig, run_id: str, smoke: bool = False) -> IngestRes
         output_partitions=[raw_uri] if raw_uri else [],
     ).to_dict()
     manifest["changed"] = changed
+    manifest["storage_dataset"] = dataset_spec.storage_dataset
+    manifest["dataset_id"] = dataset_spec.dataset_id
+    manifest["bea_table_name"] = dataset_spec.bea_table_name
     manifest["checkpoint_uri"] = checkpoint_uri
     manifest["vintage"] = {
         "requested_year_range": query.year,
