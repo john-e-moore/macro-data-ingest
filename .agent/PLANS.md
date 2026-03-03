@@ -610,7 +610,7 @@ Implement Gold modeling and Postgres serving load so Silver data can be upserted
 - [x] (2026-03-03 00:00Z) Initial planning completed.
 - [x] Gold modeling and loader implementation milestone completed.
 - [x] Unit validation completed.
-- [ ] Live staging load validation pending RDS network connectivity from local environment.
+- [x] Live staging load validation completed.
 
 ## Surprises & Discoveries
 
@@ -628,7 +628,7 @@ Implement Gold modeling and Postgres serving load so Silver data can be upserted
 
 ## Outcomes & Retrospective
 
-Load stage now reads latest Silver parquet, models Gold records, upserts idempotently into Postgres, maintains run metadata, and refreshes a YoY serving view. Unit tests and linting pass; only live DB connectivity validation remains environment-dependent.
+Load stage now reads latest Silver parquet, models Gold records, upserts idempotently into Postgres, maintains run metadata, and refreshes a YoY serving view. Unit tests pass and staging live load has been validated end-to-end.
 
 ## Context and Orientation
 
@@ -659,15 +659,14 @@ Expected outcomes:
 
 ## Validation and Acceptance
 
-Acceptance achieved (code-level):
+Acceptance achieved:
 - Gold frame modeling implemented with stable columns and scaled values.
 - Idempotent upsert implemented using Postgres `ON CONFLICT`.
 - Serving view `serving.v_pce_state_yoy` created/refreshed.
 - Run metadata persisted to `meta.ingest_runs`.
 - Unit tests pass.
-
-Pending (environment-level):
-- successful staging live load once network access to private RDS exists.
+- Staging live load succeeds with `rows=51`.
+- Idempotent rerun behavior confirmed (gold row count remains stable across reruns).
 
 ## Idempotence and Recovery
 
@@ -677,8 +676,7 @@ Idempotence:
 - Run metadata is upserted by `run_id`.
 
 Recovery:
-- Resolve network access path, then rerun `mdi load` with new `run_id`.
-- If partial DB changes occurred, re-run safely due upsert semantics.
+- If partial DB changes occur, re-run safely with new `run_id` due upsert semantics.
 
 ## Artifacts and Notes
 
@@ -692,7 +690,8 @@ Artifacts:
 
 Evidence snapshot:
 - `make lint test PYTHON=.venv/bin/python` -> pass (`16 passed`);
-- live load attempt failed due DB connection timeout (expected when private RDS is unreachable locally).
+- live staging load succeeded and wrote `51` rows to `gold.pce_state_annual`;
+- second live load rerun succeeded with `gold.pce_state_annual` row count still `51` (no duplication).
 
 ## Interfaces and Dependencies
 
@@ -711,4 +710,4 @@ Dependencies:
 - `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
 - `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
 - `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`
-- `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: in_progress (awaiting network path to RDS) - owner: codex agent`
+- `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: done - owner: codex agent`
