@@ -1,0 +1,149 @@
+from __future__ import annotations
+
+import io
+import json
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any
+
+import boto3
+import pandas as pd
+
+from macro_data_ingest.config import AppConfig
+from macro_data_ingest.load.postgres_loader import PostgresLoader
+from macro_data_ingest.run_metadata import utc_now_iso
+from macro_data_ingest.transforms.gold import to_gold_frame
+
+LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class LoadResult:
+    run_id: str
+    row_count: int
+    source_silver_uri: str
+    gold_table: str
+    manifest_uri: str
+
+
+def _find_latest_silver_key(
+    s3_client: Any, bucket: str, prefix_root: str, source: str, dataset: str
+) -> str:
+    prefix = f"{prefix_root}/silver/{source}/{dataset}/"
+    paginator = s3_client.get_paginator("list_objects_v2")
+    latest: dict[str, Any] | None = None
+
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for item in page.get("Contents", []):
+            key = item["Key"]
+            if not key.endswith(".parquet"):
+                continue
+            if latest is None or item["LastModified"] > latest["LastModified"]:
+                latest = item
+
+    if latest is None:
+        raise ValueError(f"No Silver parquet found in s3://{bucket}/{prefix}. Run transform first.")
+    return latest["Key"]
+
+
+def _read_parquet_from_s3(s3_client: Any, bucket: str, key: str) -> pd.DataFrame:
+    obj = s3_client.get_object(Bucket=bucket, Key=key)
+    return pd.read_parquet(io.BytesIO(obj["Body"].read()))
+
+
+def _write_manifest_to_s3(
+    s3_client: Any, bucket: str, key: str, payload: dict[str, Any]
+) -> str:
+    s3_client.put_object(
+        Bucket=bucket,
+        Key=key,
+        Body=json.dumps(payload, sort_keys=True).encode("utf-8"),
+        ContentType="application/json",
+    )
+    return f"s3://{bucket}/{key}"
+
+
+def _build_dsn(config: AppConfig) -> str:
+    if not config.pg_host:
+        raise ValueError("PG_HOST is required for load.")
+    if not config.pg_user or not config.pg_password:
+        raise ValueError("PG_USER and PG_PASSWORD are required for load.")
+    return (
+        f"postgresql+psycopg://{config.pg_user}:{config.pg_password}"
+        f"@{config.pg_host}:{config.pg_port}/{config.pg_database}"
+    )
+
+
+def run_load(config: AppConfig, run_id: str, smoke: bool = False) -> LoadResult:
+    del smoke  # reserved for future load variations
+    if not config.s3_data_bucket:
+        raise ValueError("S3_DATA_BUCKET is required for load.")
+
+    source = "bea"
+    dataset = "pce_state"
+    extract_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    s3 = boto3.client("s3", region_name=config.aws_region)
+
+    silver_key = _find_latest_silver_key(
+        s3_client=s3,
+        bucket=config.s3_data_bucket,
+        prefix_root=config.s3_prefix_root,
+        source=source,
+        dataset=dataset,
+    )
+    silver_frame = _read_parquet_from_s3(s3, config.s3_data_bucket, silver_key)
+    gold_frame = to_gold_frame(silver_frame)
+    if gold_frame.empty:
+        raise ValueError("Gold frame is empty; cannot load to Postgres.")
+    gold_frame["run_id"] = run_id
+
+    loader = PostgresLoader(
+        dsn=_build_dsn(config),
+        schema_gold=config.pg_schema_gold,
+        schema_meta=config.pg_schema_meta,
+    )
+    loader.ensure_base_objects()
+    loader.upsert_gold_table(
+        table_name="pce_state_annual",
+        frame=gold_frame,
+        pk_cols=["state_fips", "year", "line_code"],
+    )
+    loader.create_or_replace_views()
+    loader.record_run(
+        run_id=run_id,
+        stage="load",
+        status="success",
+        details={
+            "source_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
+            "row_count": int(len(gold_frame)),
+            "gold_table": f"{config.pg_schema_gold}.pce_state_annual",
+            "loaded_at_utc": utc_now_iso(),
+        },
+    )
+    LOGGER.info("loaded gold table into postgres", extra={"run_id": run_id, "stage": "load"})
+
+    manifest = {
+        "run_id": run_id,
+        "stage": "load",
+        "source": source,
+        "dataset": dataset,
+        "extracted_at_utc": utc_now_iso(),
+        "input_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
+        "row_count": int(len(gold_frame)),
+        "target_table": f"{config.pg_schema_gold}.pce_state_annual",
+        "target_view": "serving.v_pce_state_yoy",
+    }
+    manifest_key = (
+        f"{config.s3_prefix_root}/gold/{source}/{dataset}/"
+        f"extract_date={extract_date}/run_id={run_id}/manifest.json"
+    )
+    manifest_uri = _write_manifest_to_s3(s3, config.s3_data_bucket, manifest_key, manifest)
+
+    return LoadResult(
+        run_id=run_id,
+        row_count=int(len(gold_frame)),
+        source_silver_uri=f"s3://{config.s3_data_bucket}/{silver_key}",
+        gold_table=f"{config.pg_schema_gold}.pce_state_annual",
+        manifest_uri=manifest_uri,
+    )

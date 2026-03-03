@@ -594,3 +594,121 @@ Dependencies:
 - `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
 - `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
 - `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`
+
+---
+
+# Gold Modeling and Postgres Load Vertical Slice D
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Implement Gold modeling and Postgres serving load so Silver data can be upserted into a curated table and queried through a derived YoY view.
+
+## Progress
+
+- [x] (2026-03-03 00:00Z) Initial planning completed.
+- [x] Gold modeling and loader implementation milestone completed.
+- [x] Unit validation completed.
+- [ ] Live staging load validation pending RDS network connectivity from local environment.
+
+## Surprises & Discoveries
+
+- Observation: live `mdi load --env staging --smoke` timed out connecting to RDS from this machine.
+  Evidence: `psycopg.errors.ConnectionTimeout` against `tlg-macro-staging-pg...rds.amazonaws.com`.
+
+## Decision Log
+
+- Decision: keep RDS private and document network path requirement instead of weakening default security posture.
+  Rationale: aligns with least-privilege/network isolation; local validation can proceed once VPN/bastion path is available.
+  Date/Author: 2026-03-03, codex agent
+- Decision: establish baseline serving objects now (`gold.pce_state_annual`, `serving.v_pce_state_yoy`, `meta.ingest_runs`).
+  Rationale: provides minimal but complete serving contract for downstream BI/notebook usage.
+  Date/Author: 2026-03-03, codex agent
+
+## Outcomes & Retrospective
+
+Load stage now reads latest Silver parquet, models Gold records, upserts idempotently into Postgres, maintains run metadata, and refreshes a YoY serving view. Unit tests and linting pass; only live DB connectivity validation remains environment-dependent.
+
+## Context and Orientation
+
+Key files for this slice:
+- `src/macro_data_ingest/transforms/gold.py` for Gold frame modeling,
+- `src/macro_data_ingest/load/postgres_loader.py` for schema/table/view management and upserts,
+- `src/macro_data_ingest/load/pipeline.py` for load orchestration from S3 to Postgres,
+- `src/macro_data_ingest/cli.py` for load command wiring,
+- `tests/test_gold_transform.py` and `tests/test_postgres_loader.py` for unit coverage.
+
+## Plan of Work
+
+1. Implement Gold transformation from Silver frame.
+2. Implement Postgres loader DDL, upsert, serving view refresh, and run metadata recording.
+3. Implement load pipeline to discover latest Silver parquet and execute load.
+4. Wire `mdi load` command.
+5. Validate with lint/tests and attempt staging smoke load.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi load --env staging --smoke
+
+Expected outcomes:
+- tests/lint pass;
+- load command succeeds when DB network path is available.
+
+## Validation and Acceptance
+
+Acceptance achieved (code-level):
+- Gold frame modeling implemented with stable columns and scaled values.
+- Idempotent upsert implemented using Postgres `ON CONFLICT`.
+- Serving view `serving.v_pce_state_yoy` created/refreshed.
+- Run metadata persisted to `meta.ingest_runs`.
+- Unit tests pass.
+
+Pending (environment-level):
+- successful staging live load once network access to private RDS exists.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Re-runs of load update existing primary keys deterministically.
+- View refresh is `CREATE OR REPLACE`.
+- Run metadata is upserted by `run_id`.
+
+Recovery:
+- Resolve network access path, then rerun `mdi load` with new `run_id`.
+- If partial DB changes occurred, re-run safely due upsert semantics.
+
+## Artifacts and Notes
+
+Artifacts:
+- `src/macro_data_ingest/transforms/gold.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `src/macro_data_ingest/load/pipeline.py`
+- `src/macro_data_ingest/cli.py`
+- `tests/test_gold_transform.py`
+- `tests/test_postgres_loader.py`
+
+Evidence snapshot:
+- `make lint test PYTHON=.venv/bin/python` -> pass (`16 passed`);
+- live load attempt failed due DB connection timeout (expected when private RDS is unreachable locally).
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `mdi load --env <staging|prod> [--smoke] [--run-id <id>]`
+
+Dependencies:
+- `sqlalchemy` + `psycopg` for Postgres access.
+- `boto3` for Silver source and Gold manifest S3 operations.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
+- `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
+- `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
+- `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`
+- `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: in_progress (awaiting network path to RDS) - owner: codex agent`

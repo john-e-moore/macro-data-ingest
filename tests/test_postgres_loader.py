@@ -1,0 +1,12 @@
+import pytest
+
+from macro_data_ingest.load.postgres_loader import PostgresLoader
+
+
+def test_validate_identifier_accepts_safe_names() -> None:
+    assert PostgresLoader._validate_identifier("valid_name_1") == "valid_name_1"
+
+
+def test_validate_identifier_rejects_unsafe_names() -> None:
+    with pytest.raises(ValueError):
+        PostgresLoader._validate_identifier("bad-name;drop")

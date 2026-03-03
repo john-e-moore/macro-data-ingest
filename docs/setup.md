@@ -12,6 +12,7 @@
   - Optional SNS topics
 - BEA API key
 - Network path to Postgres (for load steps)
+  - If RDS is private (recommended), local runs require VPN/bastion/port-forward access to the VPC.
 
 ## Local Environment Setup
 
