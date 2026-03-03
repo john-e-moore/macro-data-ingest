@@ -43,12 +43,27 @@ If required information is missing, make a safe, explicit assumption and documen
 For any non-trivial implementation/refactor, the agent should:
 
 1. Read `.agent/SPEC.md` before coding.
-2. Create or update an ExecPlan in `.agent/PLANS.md` (see section below).
-3. Implement in small, testable increments.
-4. Run relevant checks/tests and record outcomes.
-5. Update docs impacted by behavioral changes.
+2. Create a feature-scoped brief under `.agent/features/` when work introduces net-new behavior (see Workflow section below).
+3. Create or update an ExecPlan in `.agent/PLANS.md` (see section below).
+4. Implement in small, testable increments.
+5. Run relevant checks/tests and record outcomes.
+6. Update docs impacted by behavioral changes.
 
 Do not stop at partial implementation unless blocked by missing credentials, external access, or explicit user direction.
+
+## Feature Workflow (Branch to PR)
+
+Use the following default workflow for substantial feature work:
+
+1. Create a feature branch from `main`.
+2. Create a feature brief at `.agent/features/<YYYY-MM-DD>-<feature-name>/SPEC.md`.
+3. Create or update an ExecPlan in `.agent/PLANS.md` and link to the feature brief.
+4. Implement in reviewable increments and keep the ExecPlan progress/decisions current.
+5. Run lint/tests/smoke checks and capture concise evidence.
+6. Open a PR using `.agent/PR_TEMPLATE.md`.
+
+Feature briefs should be concise and should not duplicate repository-wide requirements from `.agent/SPEC.md`.
+They should define scope, acceptance criteria, constraints, non-goals, and rollout/rollback notes specific to that feature.
 
 ## ExecPlans
 

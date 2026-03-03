@@ -54,7 +54,12 @@ The CLI exposes pipeline commands:
 - `mdi load --env staging --run-id <run_id>`
 - `mdi run-all --env staging --run-id <run_id>`
 
-These commands are implemented end-to-end for staging and can be used in GitHub Actions or local runs.
+By default, ingest requests BEA annual years from `BEA_START_YEAR` through current year
+(set in `.env`, default `2000`). `run-all` skips transform/load automatically when the
+ingest payload hash is unchanged.
+
+These commands are implemented end-to-end for staging and can be used in GitHub Actions
+or local runs.
 
 ## CI and Scheduling
 

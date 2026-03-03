@@ -1,5 +1,3 @@
-0. Tell the agent to update docs with the AWS bucket name, paths, etc. that I want (maybe leave alone? idk)
-1. Get initial data pipeline set up - set up AWS resources, write code, get BEA data into S3 and RDS.
-2. Add Census data.
-x. Connect RDS instance to DBeaver.
-4. Write SQL for a state-level inflation view.
+1. Get BEA PCE by state and function (SAPCE4) for all functions
+2. Fill historical BEA PCE state data
+3. Add Census data

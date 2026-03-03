@@ -5,7 +5,7 @@ import logging
 import uuid
 
 from macro_data_ingest.config import load_config
-from macro_data_ingest.ingest.pipeline import run_ingest
+from macro_data_ingest.ingest.pipeline import IngestResult, run_ingest
 from macro_data_ingest.load.pipeline import run_load
 from macro_data_ingest.logging_utils import configure_logging
 from macro_data_ingest.transforms.pipeline import run_transform
@@ -25,15 +25,18 @@ def _resolve_run_id(run_id: str | None) -> str:
     return run_id if run_id else f"run-{uuid.uuid4()}"
 
 
-def cmd_ingest(args: argparse.Namespace) -> int:
+def _run_ingest_stage(args: argparse.Namespace, run_id: str) -> IngestResult:
     config = load_config()
+    return run_ingest(config=config, run_id=run_id, smoke=args.smoke)
+
+
+def cmd_ingest(args: argparse.Namespace) -> int:
     run_id = _resolve_run_id(args.run_id)
     try:
-        result = run_ingest(config=config, run_id=run_id, smoke=args.smoke)
+        result = _run_ingest_stage(args, run_id=run_id)
     except Exception:
         LOGGER.exception("ingest failed", extra={"run_id": run_id, "stage": "ingest"})
         return 1
-
     print(
         "ingest completed "
         f"run_id={result.run_id} changed={result.changed} "
@@ -79,9 +82,23 @@ def cmd_load(args: argparse.Namespace) -> int:
 def cmd_run_all(args: argparse.Namespace) -> int:
     if args.run_id is None:
         args.run_id = _resolve_run_id(None)
-    ingest_rc = cmd_ingest(args)
-    if ingest_rc != 0:
-        return ingest_rc
+    try:
+        ingest_result = _run_ingest_stage(args, run_id=args.run_id)
+    except Exception:
+        LOGGER.exception("ingest failed", extra={"run_id": args.run_id, "stage": "ingest"})
+        return 1
+    print(
+        "ingest completed "
+        f"run_id={ingest_result.run_id} changed={ingest_result.changed} "
+        f"rows={ingest_result.row_count} manifest={ingest_result.manifest_uri}"
+    )
+    if not ingest_result.changed:
+        print(
+            "run-all skipped transform/load because ingest payload is unchanged "
+            f"for run_id={ingest_result.run_id}"
+        )
+        return 0
+
     transform_rc = cmd_transform(args)
     if transform_rc != 0:
         return transform_rc
