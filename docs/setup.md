@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.10+
 - AWS account with permissions to create:
   - S3 buckets and bucket policies
   - IAM roles/policies
@@ -33,8 +33,13 @@ Do not commit real values.
 - `AWS_ACCOUNT_ID=123456789012`
 - `AWS_ACCESS_KEY_ID=example`
 - `AWS_SECRET_ACCESS_KEY=example`
+- `AWS_VPC_ID=vpc-xxxxxxxx`
+- `AWS_PRIVATE_SUBNET_IDS=subnet-aaaa,subnet-bbbb`
+- `AWS_ALLOWED_CIDRS=10.0.0.0/16`
 - `S3_DATA_BUCKET=tlg-macro-data`
 - `S3_PREFIX_ROOT=staging`
+- `S3_LOG_BUCKET=tlg-macro-data-access-logs`
+- `GITHUB_REPO=your-org/macro-data-ingest`
 - `BEA_API_KEY=example`
 - `BEA_DATASET=NIPA`
 - `BEA_TABLE_NAME=SQPCE`
@@ -44,6 +49,8 @@ Do not commit real values.
 - `PG_DATABASE=macro`
 - `PG_USER=macro_writer`
 - `PG_PASSWORD=example`
+- `PG_INSTANCE_CLASS=db.t4g.micro`
+- `PG_ALLOCATED_STORAGE=20`
 - `PG_SCHEMA_GOLD=gold`
 - `PG_SCHEMA_META=meta`
 - `LOG_LEVEL=INFO`
@@ -53,8 +60,11 @@ Do not commit real values.
 
 Run from the repository root:
 
-- `python scripts/provision_aws.py --env staging`
-- `python scripts/provision_aws.py --env prod`
+1. Plan only (safe, no resource creation):
+   - `python scripts/provision_aws.py --env staging`
+2. Apply resources once credentials/network values are set:
+   - `python scripts/provision_aws.py --env staging --apply`
+   - `python scripts/provision_aws.py --env prod --apply`
 
 Expected provisioning outputs:
 - Bucket/prefix strategy
@@ -66,6 +76,7 @@ Expected provisioning outputs:
 Copy these outputs into:
 - local `.env`
 - GitHub repository secrets for workflows
+- environment-specific deployment notes
 
 ## GitHub Actions Secrets
 

@@ -256,3 +256,109 @@ Defined interfaces (stub level):
 ## Optional: Active ExecPlan Index
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
+
+---
+
+# AWS Provisioning Vertical Slice A
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Implement a real, idempotent AWS provisioning path that supports both `staging` and `prod` while remaining safe-by-default. Operators should be able to run plan mode first, then apply mode after filling `.env` with AWS credentials and networking settings.
+
+## Progress
+
+- [x] (2026-02-23 00:00Z) Initial planning completed.
+- [x] Provisioning implementation milestone completed.
+- [x] Local validation and documentation updates completed.
+- [ ] Live AWS apply validation pending user credentials.
+
+## Surprises & Discoveries
+
+- Observation: Existing `.env` did not yet contain required AWS networking fields for RDS provisioning.
+  Evidence: `AWS_VPC_ID` and `AWS_PRIVATE_SUBNET_IDS` were absent prior to `.env.template` update.
+
+## Decision Log
+
+- Decision: Make provisioning script default to plan-only mode and require explicit `--apply`.
+  Rationale: Prevent accidental resource creation and support safer operator workflow.
+  Date/Author: 2026-02-23, codex agent
+
+- Decision: Require explicit network parameters for RDS creation (`AWS_VPC_ID`, `AWS_PRIVATE_SUBNET_IDS`).
+  Rationale: Keeps networking assumptions explicit and avoids creating database resources in unintended networks.
+  Date/Author: 2026-02-23, codex agent
+
+## Outcomes & Retrospective
+
+`scripts/provision_aws.py` now performs a real provisioning flow in apply mode (S3, IAM, CloudWatch, SNS, RDS/security-group/subnet-group) with idempotent checks. A plan-only mode prints resource names/outputs safely without mutations. Unit tests cover planning and normalization helpers. Live apply is intentionally deferred until user-provided credentials are in place.
+
+## Context and Orientation
+
+Key files touched in this slice:
+- `scripts/provision_aws.py` for plan/apply logic and AWS API calls,
+- `src/macro_data_ingest/config.py` for additional provisioning environment fields,
+- `.env.template` for required settings,
+- `docs/setup.md` and `README.md` for operator instructions,
+- `tests/test_provision_plan.py` for provisioning-plan unit coverage.
+
+## Plan of Work
+
+1. Replace provisioning scaffold with plan/apply implementation and idempotent ensures.
+2. Extend config surface with required AWS/network/database settings.
+3. Add tests for deterministic plan behavior.
+4. Update setup documentation for plan-before-apply workflow.
+5. Validate with lint and unit tests only (no live apply yet).
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/python scripts/provision_aws.py --env staging
+
+Expected outcomes:
+- tests/lint pass;
+- plan mode prints summary and no resources are created.
+
+## Validation and Acceptance
+
+Slice acceptance criteria:
+- Provisioning CLI supports `--env` and explicit `--apply`.
+- Plan mode performs no mutations and emits copyable outputs.
+- Apply mode path includes idempotent checks for required resources.
+- Docs describe required environment variables and sequence.
+- Unit tests pass for planning helpers.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Existing S3 buckets, IAM roles, log groups, subnet groups, SG rules, and RDS instance are reused.
+- Existing SNS ARN from config is reused when supplied.
+
+Recovery:
+- Re-run `--apply` after partial failure; ensures will reuse already-created resources.
+- For rollback, delete resources in reverse dependency order (RDS -> SG/SubnetGroup -> IAM/SNS/Logs -> S3).
+
+## Artifacts and Notes
+
+Artifacts:
+- `scripts/provision_aws.py`
+- `tests/test_provision_plan.py`
+- `docs/setup.md`
+- `.env.template`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `python scripts/provision_aws.py --env <staging|prod>`
+- `python scripts/provision_aws.py --env <staging|prod> --apply`
+
+Dependencies:
+- `boto3` and `botocore` for AWS API operations.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
+- `2026-02-23 - AWS Provisioning Vertical Slice A - status: in_progress (awaiting live apply) - owner: codex agent`

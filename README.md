@@ -37,8 +37,9 @@ Scaffolding and documentation are in place. Implementation will proceed in commi
 ## Provision AWS Resources
 
 After filling `.env`, run:
-- `python scripts/provision_aws.py --env staging`
-- `python scripts/provision_aws.py --env prod`
+- `python scripts/provision_aws.py --env staging` (plan mode, no changes)
+- `python scripts/provision_aws.py --env staging --apply`
+- `python scripts/provision_aws.py --env prod --apply`
 
 The script prints a summary of resource names/identifiers that should be copied into `.env` and GitHub secrets.
 
