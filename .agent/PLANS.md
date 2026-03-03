@@ -18,6 +18,18 @@ Create/update an ExecPlan before implementation when work is complex, high-risk,
 
 For small local fixes (single-file bug fix, typo, minor test update), an ExecPlan is optional.
 
+## Relationship to Feature Briefs
+
+`.agent/SPEC.md` remains the repository-level source of truth for baseline requirements.
+
+For substantial feature work, create a feature brief at:
+
+- `.agent/features/<YYYY-MM-DD>-<feature-name>/SPEC.md`
+
+Then create/update an ExecPlan in this file that references the feature brief path near the top (`Purpose / Big Picture` or `Context and Orientation`).
+
+Feature briefs should stay focused on feature-local requirements (scope, acceptance criteria, non-goals, constraints, rollout/rollback) and should not duplicate the full repo baseline spec.
+
 ## Core Principles
 
 Every ExecPlan must be:
@@ -46,6 +58,12 @@ Each ExecPlan must include all sections below:
 10. Idempotence and Recovery
 11. Artifacts and Notes
 12. Interfaces and Dependencies
+
+Additionally, each ExecPlan should include a short "Links" line near the top listing:
+
+- feature branch name,
+- feature brief path (if applicable),
+- PR URL (once opened).
 
 `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` are mandatory living sections and must be kept up to date during execution.
 
