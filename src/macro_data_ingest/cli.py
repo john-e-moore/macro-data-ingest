@@ -7,6 +7,7 @@ import uuid
 from macro_data_ingest.config import load_config
 from macro_data_ingest.ingest.pipeline import run_ingest
 from macro_data_ingest.logging_utils import configure_logging
+from macro_data_ingest.transforms.pipeline import run_transform
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,8 +42,19 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 
 def cmd_transform(args: argparse.Namespace) -> int:
+    config = load_config()
     run_id = _resolve_run_id(args.run_id)
-    print(f"[SCAFFOLD] transform env={args.env} run_id={run_id} smoke={args.smoke}")
+    try:
+        result = run_transform(config=config, run_id=run_id, smoke=args.smoke)
+    except Exception:
+        LOGGER.exception("transform failed", extra={"run_id": run_id, "stage": "transform"})
+        return 1
+
+    print(
+        "transform completed "
+        f"run_id={result.run_id} rows={result.row_count} "
+        f"silver={result.silver_uri} manifest={result.manifest_uri}"
+    )
     return 0
 
 

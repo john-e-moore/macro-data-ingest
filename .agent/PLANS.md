@@ -483,3 +483,114 @@ Dependencies:
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
 - `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
 - `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
+
+---
+
+# Silver Normalization and Quality Checks Vertical Slice C
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Implement a real transform stage that reads latest Bronze BEA payloads, normalizes them into a stable Silver schema, enforces baseline data quality checks, and writes Parquet + manifest outputs to S3.
+
+## Progress
+
+- [x] (2026-03-03 00:00Z) Initial planning completed.
+- [x] Transformation implementation milestone completed.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: The newest Bronze run may not contain a payload object when ingest detects no change.
+  Evidence: no-change ingest run wrote manifest/checkpoint only.
+- Observation: Bronze payload includes nation and BEA region records in addition to states.
+  Evidence: sample payload included `GeoFips` values `00000` and `91xxx`-`98xxx`.
+
+## Decision Log
+
+- Decision: Transform stage finds the latest available Bronze payload object instead of relying on latest run folder.
+  Rationale: Supports ingest no-change runs while still enabling transforms.
+  Date/Author: 2026-03-03, codex agent
+- Decision: Silver output for this slice keeps only state + DC rows.
+  Rationale: Aligns with immediate state-level serving scope and stabilizes keys.
+  Date/Author: 2026-03-03, codex agent
+
+## Outcomes & Retrospective
+
+`mdi transform` now reads Bronze payloads from S3, creates typed state-level Silver records, validates non-null/uniqueness checks, and writes Parquet + manifest to Silver S3 paths. Smoke validation succeeded against staging with 51 records.
+
+## Context and Orientation
+
+Key files for this slice:
+- `src/macro_data_ingest/transforms/silver.py` for normalization and DQ checks,
+- `src/macro_data_ingest/transforms/pipeline.py` for S3 IO and transform orchestration,
+- `src/macro_data_ingest/cli.py` for transform command execution,
+- `tests/test_silver_transform.py` for transform and quality-check unit coverage,
+- `docs/architecture.md` for updated partitioning examples.
+
+## Plan of Work
+
+1. Implement Silver transform schema normalization.
+2. Add baseline DQ checks (row count, non-null required keys, uniqueness).
+3. Implement transform pipeline read/write over S3 Bronze/Silver layers.
+4. Wire CLI command and run unit tests.
+5. Run staging smoke transform and inspect resulting Parquet sample.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi transform --env staging --smoke
+
+Expected outcomes:
+- lint/tests pass;
+- transform writes Silver parquet + manifest with valid row counts.
+
+## Validation and Acceptance
+
+Acceptance checks achieved:
+- Silver transform produces stable typed columns.
+- DQ checks fail on empty/null/duplicate-key violations.
+- Transform command writes Silver outputs under deterministic keys.
+- Unit tests pass and staging smoke run completes successfully.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Re-running transform creates deterministic partitioned run outputs.
+- Input discovery remains stable by selecting latest Bronze payload object.
+
+Recovery:
+- If transform fails after write, rerun with a new `run_id`; previous output is immutable and traceable via manifest.
+
+## Artifacts and Notes
+
+Artifacts:
+- `src/macro_data_ingest/transforms/silver.py`
+- `src/macro_data_ingest/transforms/pipeline.py`
+- `src/macro_data_ingest/cli.py`
+- `tests/test_silver_transform.py`
+- `docs/architecture.md`
+
+Evidence snapshot:
+- `make lint test PYTHON=.venv/bin/python` -> pass (`13 passed`);
+- staging smoke transform wrote Silver parquet with `rows=51`.
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `mdi transform --env <staging|prod> [--smoke] [--run-id <id>]`
+
+Dependencies:
+- `boto3` for S3 reads/writes.
+- `pandas` + `pyarrow` for Silver Parquet output.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
+- `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
+- `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
+- `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`

@@ -1,0 +1,91 @@
+import pandas as pd
+import pytest
+
+from macro_data_ingest.transforms.silver import to_silver_frame, validate_silver_frame
+
+
+def _sample_payload() -> dict:
+    return {
+        "BEAAPI": {
+            "Results": {
+                "Data": [
+                    {
+                        "GeoFips": "00000",
+                        "GeoName": "United States *",
+                        "TimePeriod": "2024",
+                        "Code": "SAPCE3-1",
+                        "DataValue": "1000.0",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "*",
+                    },
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024",
+                        "Code": "SAPCE3-1",
+                        "DataValue": "123.4",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    },
+                    {
+                        "GeoFips": "91000",
+                        "GeoName": "New England",
+                        "TimePeriod": "2024",
+                        "Code": "SAPCE3-1",
+                        "DataValue": "456.7",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    },
+                ]
+            }
+        }
+    }
+
+
+def test_to_silver_frame_keeps_only_state_rows() -> None:
+    silver = to_silver_frame(_sample_payload())
+    assert len(silver) == 1
+    assert silver.iloc[0]["state_abbrev"] == "AL"
+    assert silver.iloc[0]["line_code"] == "1"
+
+
+def test_validate_silver_frame_happy_path() -> None:
+    silver = to_silver_frame(_sample_payload())
+    validate_silver_frame(silver)
+
+
+def test_validate_silver_frame_duplicate_pk_fails() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "state_fips": "01",
+                "state_abbrev": "AL",
+                "geo_name": "Alabama",
+                "year": 2024,
+                "line_code": "1",
+                "series_code": "SAPCE3-1",
+                "value": 1.0,
+                "unit": "u",
+                "unit_mult": 6,
+                "note_ref": "",
+            },
+            {
+                "state_fips": "01",
+                "state_abbrev": "AL",
+                "geo_name": "Alabama",
+                "year": 2024,
+                "line_code": "1",
+                "series_code": "SAPCE3-1",
+                "value": 2.0,
+                "unit": "u",
+                "unit_mult": 6,
+                "note_ref": "",
+            },
+        ]
+    )
+
+    with pytest.raises(ValueError):
+        validate_silver_frame(frame)

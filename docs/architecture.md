@@ -18,6 +18,7 @@ Orchestration is handled by GitHub Actions on a daily schedule plus manual dispa
 - **Silver**
   - Stable schemas and typed columns
   - Normalized keys for geography/time/category
+  - Current slice keeps state + DC rows with keys: `state_fips`, `state_abbrev`, `year`, `line_code`
 - **Gold**
   - Consumer-friendly facts/aggregates suitable for BI and SQL analysis
 
@@ -28,8 +29,8 @@ Root pattern:
 `s3://<bucket>/<env>/<layer>/<source>/<dataset>/<extract_date>/...`
 
 Examples:
-- `s3://tlg-macro-data/staging/bronze/bea/pce_state/2026-02-23/payload.json`
-- `s3://tlg-macro-data/staging/silver/bea/pce_state/year=2025/state=CA/part-000.parquet`
+- `s3://tlg-macro-data/staging/bronze/bea/pce_state/extract_date=2026-03-03/run_id=<run_id>/payload.json`
+- `s3://tlg-macro-data/staging/silver/bea/pce_state/extract_date=2026-03-03/run_id=<run_id>/part-000.parquet`
 - `s3://tlg-macro-data/staging/gold/bea/pce_state_metrics/year=2025/part-000.parquet`
 
 Design notes:
