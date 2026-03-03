@@ -30,3 +30,22 @@ def utc_now_iso() -> str:
 def stable_payload_hash(payload: dict[str, Any]) -> str:
     encoded = dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return sha256(encoded).hexdigest()
+
+
+def stable_rows_hash(rows: list[dict[str, Any]]) -> str:
+    """Compute a deterministic content hash for BEA row payloads.
+
+    Source payloads include volatile metadata fields (for example, production timestamps)
+    that should not trigger downstream reprocessing when row-level business content is
+    unchanged.
+    """
+    normalized_rows = [dict(sorted(row.items())) for row in rows]
+    normalized_rows.sort(
+        key=lambda row: (
+            str(row.get("Code", "")),
+            str(row.get("GeoFips", "")),
+            str(row.get("TimePeriod", "")),
+        )
+    )
+    encoded = dumps(normalized_rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return sha256(encoded).hexdigest()

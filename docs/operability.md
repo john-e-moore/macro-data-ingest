@@ -43,6 +43,11 @@ Guidelines:
 - Preserve Bronze immutability; regenerate Silver/Gold deterministically
 - Use idempotent upserts for Postgres targets
 
+Current policy:
+- Daily ingest requests the configured full annual range (`BEA_START_YEAR` through current year).
+- A checkpoint content hash (normalized `Results.Data` rows) gates downstream stages; transform/load run only when business rows change.
+- Checkpoints and manifests carry lightweight vintage metadata (`requested_year_range`, payload hash, prior payload hash, source release tag when available).
+
 Recommended controls:
 - Limit batch size by date interval
 - Use resumable checkpoints to continue partial backfills

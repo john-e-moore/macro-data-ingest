@@ -45,6 +45,7 @@ Do not commit real values.
 - `BEA_DATASET=Regional`
 - `BEA_TABLE_NAME=SAPCE3`
 - `BEA_FREQUENCY=A`
+- `BEA_START_YEAR=2000`
 - `PG_HOST=example.rds.amazonaws.com`
 - `PG_PORT=5432`
 - `PG_DATABASE=macro`
@@ -101,6 +102,7 @@ Recommended optional secrets (override defaults when needed):
 - `BEA_DATASET` (default `Regional`)
 - `BEA_TABLE_NAME` (default `SAPCE3`)
 - `BEA_FREQUENCY` (default `A`)
+- `BEA_START_YEAR` (default `2000`; ingestion requests this year through current year)
 
 ## Rollback / Cleanup Guidance (Manual)
 

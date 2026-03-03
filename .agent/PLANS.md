@@ -822,6 +822,107 @@ Dependencies:
 
 ---
 
+# Vintage Strategy and SAPCE3 Historical Backfill
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Implement a lightweight vintage-aware ingest strategy where daily runs request a configured full annual range (from a start year through current year), use payload hashes to gate downstream processing, and persist vintage metadata for reproducibility. Immediately use that strategy to backfill SAPCE3 from year 2000 onward.
+
+## Progress
+
+- [x] (2026-03-03 00:00Z) Initial planning completed.
+- [x] Code updates for configurable start-year range and vintage metadata completed.
+- [x] Change-gated `run-all` behavior implemented.
+- [x] Validation and live SAPCE3 backfill run completed.
+
+## Surprises & Discoveries
+
+- Observation: Existing `run-all` always executed transform/load even when ingest payload hash was unchanged.
+  Evidence: `src/macro_data_ingest/cli.py` called stage commands sequentially without a changed gate.
+- Observation: Hashing full BEA payload caused false positives because `UTCProductionTime` changes every API response.
+  Evidence: two immediate SAPCE3 runs both showed `changed=True` until hash scope was narrowed to normalized `Results.Data` rows.
+
+## Decision Log
+
+- Decision: Use full-range daily requests (`BEA_START_YEAR` to current year) with payload-hash change detection.
+  Rationale: Keeps revision handling simple at current data volume while avoiding unnecessary downstream work on unchanged payloads.
+  Date/Author: 2026-03-03, codex agent
+
+## Outcomes & Retrospective
+
+Implemented and validated end-to-end. Lint/tests pass (`22 passed`), SAPCE3 backfill ran successfully from year 2000 through current year, and an immediate rerun confirmed no-op downstream behavior when row content is unchanged. This preserves revision coverage while avoiding unnecessary transform/load cycles on stable source data.
+
+## Context and Orientation
+
+Key files:
+- `src/macro_data_ingest/config.py` for env-driven ingest range settings.
+- `src/macro_data_ingest/ingest/pipeline.py` and `src/macro_data_ingest/ingest/bronze_writer.py` for vintage/hash checkpoint metadata.
+- `src/macro_data_ingest/cli.py` for change-gated orchestration.
+- `docs/operability.md`, `docs/setup.md`, `.env.template` for runbook/config updates.
+
+## Plan of Work
+
+1. Add `BEA_START_YEAR` configuration and derive explicit request year ranges.
+2. Extend checkpoint/manifest metadata with vintage context.
+3. Gate transform/load when ingest payload hash is unchanged.
+4. Add tests for year range and run-all skip behavior.
+5. Run lint/tests and execute SAPCE3 backfill (2000-current).
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    BEA_TABLE_NAME=SAPCE3 BEA_START_YEAR=2000 .venv/bin/mdi run-all --env staging --run-id backfill-sapce3-2000
+
+Expected outcomes:
+- tests and lint pass;
+- ingest writes/reuses Bronze payload and checkpoint with vintage metadata;
+- transform/load only run when ingest changes.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- Ingest query year range starts at configured `BEA_START_YEAR`.
+- Checkpoint includes `requested_year_range` and payload hash lineage.
+- `run-all` skips transform/load on unchanged payload.
+- SAPCE3 historical backfill completes for 2000-current or reports explicit external blocker.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Re-running with same source payload hash no-ops downstream transforms/load.
+- Postgres upsert remains key-based and deterministic.
+
+Recovery:
+- If run fails after ingest, rerun with a new run ID; unchanged payload gates duplicate downstream work.
+
+## Artifacts and Notes
+
+Primary artifacts:
+- `src/macro_data_ingest/config.py`
+- `src/macro_data_ingest/ingest/pipeline.py`
+- `src/macro_data_ingest/ingest/bronze_writer.py`
+- `src/macro_data_ingest/cli.py`
+- `tests/test_ingest_pipeline.py`
+- `tests/test_cli.py`
+- `docs/setup.md`
+- `docs/operability.md`
+- `.env.template`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- Env var: `BEA_START_YEAR`
+- CLI: `mdi run-all --env <staging|prod> --run-id <id>`
+
+Dependencies:
+- BEA API availability and credentials,
+- AWS S3 and Postgres connectivity for live backfill.
+
+---
+
 ## Optional: Active ExecPlan Index
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
@@ -830,3 +931,4 @@ Dependencies:
 - `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`
 - `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: done - owner: codex agent`
 - `2026-03-03 - CI and Scheduler Hardening Vertical Slice E - status: done - owner: codex agent`
+- `2026-03-03 - Vintage Strategy and SAPCE3 Historical Backfill - status: done - owner: codex agent`

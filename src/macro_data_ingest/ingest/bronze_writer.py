@@ -86,12 +86,18 @@ class BronzeWriter:
         payload_hash: str,
         run_id: str,
         extracted_at_utc: str,
+        requested_year_range: str,
+        previous_payload_hash: str | None = None,
+        source_release_tag: str | None = None,
     ) -> str:
         key = self._checkpoint_key(source, dataset)
         body = {
             "payload_hash": payload_hash,
+            "previous_payload_hash": previous_payload_hash,
             "run_id": run_id,
             "extracted_at_utc": extracted_at_utc,
+            "requested_year_range": requested_year_range,
+            "source_release_tag": source_release_tag,
         }
         self.s3.put_object(
             Bucket=self.bucket,
