@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from macro_data_ingest.ingest.pipeline import _is_changed, _source_release_tag, _year_range
+from macro_data_ingest.ingest.bea_client import BeaQuery
+from macro_data_ingest.ingest.pipeline import _fetch_payload, _is_changed, _source_release_tag, _year_range
 from macro_data_ingest.run_metadata import stable_rows_hash
 
 
@@ -50,3 +51,32 @@ def test_stable_rows_hash_ignores_row_order() -> None:
     ]
     rows_b = [rows_a[1], rows_a[0]]
     assert stable_rows_hash(rows_a) == stable_rows_hash(rows_b)
+
+
+def test_fetch_payload_expands_all_line_codes() -> None:
+    class DummyClient:
+        def fetch_line_codes(self, dataset: str, table_name: str) -> list[str]:
+            assert dataset == "Regional"
+            assert table_name == "SAPCE4"
+            return ["1", "10"]
+
+        def fetch(self, query: BeaQuery) -> dict:
+            return {
+                "BEAAPI": {
+                    "Results": {
+                        "Data": [
+                            {"Code": f"SAPCE4-{query.line_code}", "GeoFips": "01000", "TimePeriod": "2024"}
+                        ]
+                    }
+                }
+            }
+
+        @staticmethod
+        def extract_rows(payload: dict) -> list[dict]:
+            return payload["BEAAPI"]["Results"]["Data"]
+
+    query = BeaQuery(dataset="Regional", table_name="SAPCE4", year="2024", line_code="ALL")
+    payload, used_query, rows = _fetch_payload(DummyClient(), query, smoke=False)
+    assert used_query.line_code == "ALL"
+    assert len(rows) == 2
+    assert len(payload["BEAAPI"]["Results"]["Data"]) == 2

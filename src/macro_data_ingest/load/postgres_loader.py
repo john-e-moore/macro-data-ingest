@@ -153,7 +153,8 @@ class PostgresLoader:
         schema_gold = self._validate_identifier(self.schema_gold)
         schema_serving = self._validate_identifier(self.schema_serving)
         view_sql = f"""
-        CREATE OR REPLACE VIEW {schema_serving}.v_pce_state_yoy AS
+        DROP VIEW IF EXISTS {schema_serving}.v_pce_state_yoy;
+        CREATE VIEW {schema_serving}.v_pce_state_yoy AS
         SELECT
             cur.bea_table_name,
             cur.state_fips,
