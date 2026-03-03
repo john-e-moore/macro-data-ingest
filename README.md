@@ -12,12 +12,13 @@ The pipeline is designed to be idempotent, observable, and reproducible, with da
 
 ## Current Status
 
-Scaffolding and documentation are in place. Implementation will proceed in commit-ready vertical slices:
-1. Provisioning and environment bootstrap
-2. Ingestion (BEA -> Bronze + manifests + change detection)
-3. Silver transforms + quality checks
-4. Gold modeling + Postgres load + views
-5. CI hardening and smoke paths
+Implemented and validated vertical slices:
+1. Provisioning and environment bootstrap (staging resources created)
+2. Ingestion (BEA -> Bronze + manifests + hash-based change detection)
+3. Silver transforms + baseline quality checks
+4. Gold modeling + Postgres load + YoY serving view
+
+Remaining: final CI/scheduler hardening and production rollout checks.
 
 ## Quickstart (Local)
 
@@ -45,15 +46,15 @@ The script prints a summary of resource names/identifiers that should be copied 
 
 Provisioning behavior details and rollback guidance: `docs/setup.md`.
 
-## Pipeline Commands (Scaffolded)
+## Pipeline Commands
 
-The CLI exposes staged pipeline commands:
+The CLI exposes pipeline commands:
 - `mdi ingest --env staging --run-id <run_id>`
 - `mdi transform --env staging --run-id <run_id>`
 - `mdi load --env staging --run-id <run_id>`
 - `mdi run-all --env staging --run-id <run_id>`
 
-At scaffold stage, these commands are structured and wired but not fully implemented.
+These commands are implemented end-to-end for staging and can be used in GitHub Actions or local runs.
 
 ## CI and Scheduling
 

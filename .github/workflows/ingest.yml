@@ -17,9 +17,17 @@ on:
         required: true
         default: false
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ingest-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   run-pipeline:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       APP_ENV: ${{ github.event.inputs.env || 'prod' }}
       LOG_LEVEL: INFO
@@ -49,13 +57,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .[dev]
 
+      - name: Prepare run metadata
+        run: |
+          mkdir -p logs manifests
+          echo "RUN_ID=gha-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
       - name: Execute pipeline
         run: |
           if [ "${{ github.event.inputs.smoke }}" = "true" ]; then
-            mdi run-all --env "$APP_ENV" --smoke
+            mdi run-all --env "$APP_ENV" --run-id "$RUN_ID" --smoke 2>&1 | tee logs/pipeline.log
           else
-            mdi run-all --env "$APP_ENV"
+            mdi run-all --env "$APP_ENV" --run-id "$RUN_ID" 2>&1 | tee logs/pipeline.log
           fi
+          cat <<EOF > manifests/run_context.json
+          {
+            "run_id": "${RUN_ID}",
+            "app_env": "${APP_ENV}",
+            "github_run_id": "${GITHUB_RUN_ID}",
+            "github_run_attempt": "${GITHUB_RUN_ATTEMPT}",
+            "smoke": "${{ github.event.inputs.smoke || 'false' }}"
+          }
+          EOF
 
       - name: Upload logs and metadata
         if: always()

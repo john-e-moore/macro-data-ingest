@@ -711,3 +711,104 @@ Dependencies:
 - `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
 - `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`
 - `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: done - owner: codex agent`
+
+---
+
+# CI and Scheduler Hardening Vertical Slice E
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Harden CI/scheduler behavior so automated runs are traceable, stable, and operationally debuggable with explicit run metadata and artifact capture.
+
+## Progress
+
+- [x] (2026-03-03 00:00Z) Initial planning completed.
+- [x] Workflow and CLI hardening implementation completed.
+- [x] Validation and retrospective updates completed.
+
+## Surprises & Discoveries
+
+- Observation: `mdi run-all` generated separate run IDs per stage unless an explicit `--run-id` was provided.
+  Evidence: stage handlers independently called `_resolve_run_id`.
+
+## Decision Log
+
+- Decision: force a shared run ID in `run-all` when caller does not provide one.
+  Rationale: preserves stage lineage correlation and easier debugging.
+  Date/Author: 2026-03-03, codex agent
+- Decision: make ingest workflow emit local artifacts (`logs/pipeline.log`, `manifests/run_context.json`) every run.
+  Rationale: improves failure triage directly in GitHub Actions UI.
+  Date/Author: 2026-03-03, codex agent
+
+## Outcomes & Retrospective
+
+Workflow and CLI hardening were validated locally with `make lint test` and a full staging smoke `mdi run-all`. All stages executed successfully under a shared `run_id`, and outputs were written across Bronze/Silver/Gold with consistent lineage.
+
+## Context and Orientation
+
+Key files:
+- `src/macro_data_ingest/cli.py` for shared run ID behavior in `run-all`,
+- `.github/workflows/ingest.yml` for scheduler hardening,
+- `README.md` and `docs/setup.md` for updated operational guidance.
+
+## Plan of Work
+
+1. Fix run ID consistency in `run-all`.
+2. Add workflow permissions/concurrency/timeout safeguards.
+3. Add per-run artifact generation and upload support.
+4. Update docs to reflect implemented (not scaffold) state.
+5. Validate with lint/tests and local smoke `mdi run-all`.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi run-all --env staging --smoke
+
+Expected outcomes:
+- lint/tests pass;
+- local run-all succeeds with shared `run_id` through all stages.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- `run-all` uses one run ID across ingest/transform/load.
+- scheduler workflow captures logs/manifests artifacts.
+- docs reflect current implementation maturity.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Re-runs preserve deterministic behavior with explicit run IDs.
+
+Recovery:
+- Workflow artifacts provide the run context needed to retry failed runs.
+
+## Artifacts and Notes
+
+Artifacts:
+- `src/macro_data_ingest/cli.py`
+- `.github/workflows/ingest.yml`
+- `README.md`
+- `docs/setup.md`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `mdi run-all --env <staging|prod> [--smoke] [--run-id <id>]`
+
+Dependencies:
+- GitHub Actions runtime with configured repository secrets.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
+- `2026-02-23 - AWS Provisioning Vertical Slice A - status: done (staging applied) - owner: codex agent`
+- `2026-03-03 - BEA Ingest to Bronze Vertical Slice B - status: done - owner: codex agent`
+- `2026-03-03 - Silver Normalization and Quality Checks Vertical Slice C - status: done - owner: codex agent`
+- `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: done - owner: codex agent`
+- `2026-03-03 - CI and Scheduler Hardening Vertical Slice E - status: done - owner: codex agent`

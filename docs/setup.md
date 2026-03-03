@@ -96,6 +96,12 @@ Set repository-level secrets:
 - `S3_PREFIX_ROOT`
 - `SNS_ALERT_TOPIC_ARN` (optional)
 
+Recommended optional secrets (override defaults when needed):
+
+- `BEA_DATASET` (default `Regional`)
+- `BEA_TABLE_NAME` (default `SAPCE3`)
+- `BEA_FREQUENCY` (default `A`)
+
 ## Rollback / Cleanup Guidance (Manual)
 
 If provisioning created incorrect resources:

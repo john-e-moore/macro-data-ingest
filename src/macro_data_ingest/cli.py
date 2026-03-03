@@ -77,6 +77,8 @@ def cmd_load(args: argparse.Namespace) -> int:
 
 
 def cmd_run_all(args: argparse.Namespace) -> int:
+    if args.run_id is None:
+        args.run_id = _resolve_run_id(None)
     ingest_rc = cmd_ingest(args)
     if ingest_rc != 0:
         return ingest_rc
