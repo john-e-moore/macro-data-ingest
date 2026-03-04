@@ -51,6 +51,7 @@ class PostgresLoader:
             year INTEGER NOT NULL,
             line_code TEXT NOT NULL,
             series_code TEXT NOT NULL,
+            function_name TEXT NOT NULL,
             pce_value DOUBLE PRECISION NOT NULL,
             pce_value_scaled DOUBLE PRECISION NOT NULL,
             unit TEXT NOT NULL,
@@ -74,6 +75,14 @@ class PostgresLoader:
             conn.execute(
                 text(
                     f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ADD COLUMN IF NOT EXISTS function_name TEXT;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
                     UPDATE {schema_gold}.pce_state_annual
                     SET bea_table_name = split_part(series_code, '-', 1)
                     WHERE bea_table_name IS NULL;
@@ -88,6 +97,104 @@ class PostgresLoader:
                     """
                 )
             )
+            conn.execute(
+                text(
+                    f"""
+                    UPDATE {schema_gold}.pce_state_annual
+                    SET function_name = ''
+                    WHERE function_name IS NULL;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ALTER COLUMN function_name SET NOT NULL;
+                    """
+                )
+            )
+            column_positions = conn.execute(
+                text(
+                    """
+                    SELECT column_name, ordinal_position
+                    FROM information_schema.columns
+                    WHERE table_schema = :schema_name
+                      AND table_name = 'pce_state_annual'
+                    """
+                ),
+                {"schema_name": schema_gold},
+            ).fetchall()
+            positions = {row[0]: int(row[1]) for row in column_positions}
+            desired_order = (
+                positions.get("series_code", 0)
+                < positions.get("function_name", 0)
+                < positions.get("pce_value", 0)
+            )
+            if not desired_order:
+                conn.execute(
+                    text(
+                        f"""
+                        DROP TABLE IF EXISTS {schema_gold}.pce_state_annual_reordered;
+                        DROP VIEW IF EXISTS {schema_serving}.v_pce_state_yoy;
+                        CREATE TABLE {schema_gold}.pce_state_annual_reordered (
+                            bea_table_name TEXT NOT NULL,
+                            state_fips TEXT NOT NULL,
+                            state_abbrev TEXT NOT NULL,
+                            geo_name TEXT NOT NULL,
+                            year INTEGER NOT NULL,
+                            line_code TEXT NOT NULL,
+                            series_code TEXT NOT NULL,
+                            function_name TEXT NOT NULL,
+                            pce_value DOUBLE PRECISION NOT NULL,
+                            pce_value_scaled DOUBLE PRECISION NOT NULL,
+                            unit TEXT NOT NULL,
+                            unit_mult INTEGER NOT NULL,
+                            note_ref TEXT NULL,
+                            run_id TEXT NOT NULL,
+                            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                            PRIMARY KEY (bea_table_name, state_fips, year, line_code)
+                        );
+                        INSERT INTO {schema_gold}.pce_state_annual_reordered (
+                            bea_table_name,
+                            state_fips,
+                            state_abbrev,
+                            geo_name,
+                            year,
+                            line_code,
+                            series_code,
+                            function_name,
+                            pce_value,
+                            pce_value_scaled,
+                            unit,
+                            unit_mult,
+                            note_ref,
+                            run_id,
+                            loaded_at
+                        )
+                        SELECT
+                            bea_table_name,
+                            state_fips,
+                            state_abbrev,
+                            geo_name,
+                            year,
+                            line_code,
+                            series_code,
+                            COALESCE(function_name, ''),
+                            pce_value,
+                            pce_value_scaled,
+                            unit,
+                            unit_mult,
+                            note_ref,
+                            run_id,
+                            loaded_at
+                        FROM {schema_gold}.pce_state_annual;
+                        DROP TABLE {schema_gold}.pce_state_annual;
+                        ALTER TABLE {schema_gold}.pce_state_annual_reordered
+                        RENAME TO pce_state_annual;
+                        """
+                    )
+                )
             pk_name = conn.execute(
                 text(
                     """

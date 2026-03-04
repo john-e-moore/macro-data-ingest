@@ -82,6 +82,7 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
                 "bea_table_name",
                 "line_code",
                 "series_code",
+                "function_name",
                 "value",
                 "unit",
                 "unit_mult",
@@ -103,6 +104,10 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
         frame["bea_table_name"] = frame["Code"].astype(str).str.split("-", n=1).str[0].str.upper()
     frame["value"] = pd.to_numeric(frame["DataValue"].astype(str).str.replace(",", ""), errors="coerce")
     frame["unit_mult"] = pd.to_numeric(frame["UNIT_MULT"], errors="coerce").fillna(0).astype(int)
+    if "FunctionName" not in frame.columns and "LineDescription" in frame.columns:
+        frame["FunctionName"] = frame["LineDescription"]
+    if "FunctionName" not in frame.columns:
+        frame["FunctionName"] = ""
 
     silver = frame[
         [
@@ -113,6 +118,7 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
             "bea_table_name",
             "line_code",
             "Code",
+            "FunctionName",
             "value",
             "CL_UNIT",
             "unit_mult",
@@ -122,10 +128,12 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
         columns={
             "GeoName": "geo_name",
             "Code": "series_code",
+            "FunctionName": "function_name",
             "CL_UNIT": "unit",
             "NoteRef": "note_ref",
         }
     )
+    silver["function_name"] = silver["function_name"].fillna("").astype(str)
     silver = silver.sort_values(
         ["bea_table_name", "year", "state_fips", "line_code"]
     ).reset_index(drop=True)

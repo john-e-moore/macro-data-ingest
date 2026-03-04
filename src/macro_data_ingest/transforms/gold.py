@@ -13,6 +13,7 @@ def to_gold_frame(silver_frame: pd.DataFrame) -> pd.DataFrame:
         "bea_table_name",
         "line_code",
         "series_code",
+        "function_name",
         "value",
         "unit",
         "unit_mult",

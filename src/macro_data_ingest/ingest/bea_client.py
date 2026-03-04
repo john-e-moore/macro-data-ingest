@@ -28,7 +28,7 @@ class BeaClient:
         timeout_seconds: int = 60,
         max_retries: int = 5,
         retry_backoff_seconds: float = 1.0,
-        min_request_interval_seconds: float = 0.1,
+        min_request_interval_seconds: float = 0.25,
     ) -> None:
         self.api_key = api_key
         self.timeout_seconds = timeout_seconds
@@ -115,6 +115,9 @@ class BeaClient:
         return payload.get("BEAAPI", {}).get("Results", {}).get("Data", [])
 
     def fetch_line_codes(self, dataset: str, table_name: str) -> list[str]:
+        return list(self.fetch_line_code_descriptions(dataset, table_name).keys())
+
+    def fetch_line_code_descriptions(self, dataset: str, table_name: str) -> dict[str, str]:
         payload = self._request(
             {
                 "UserID": self.api_key,
@@ -131,9 +134,13 @@ class BeaClient:
             detail = error.get("ErrorDetail", {}).get("Description", "")
             raise ValueError(f"BEA API error: {description}. {detail}".strip())
         values = payload.get("BEAAPI", {}).get("Results", {}).get("ParamValue", [])
-        keys = [str(item.get("Key", "")).strip() for item in values if str(item.get("Key", "")).strip()]
-        if not keys:
+        mapping = {
+            str(item.get("Key", "")).strip(): str(item.get("Desc", "")).strip()
+            for item in values
+            if str(item.get("Key", "")).strip()
+        }
+        if not mapping:
             raise ValueError(
                 f"No LineCode values returned for dataset={dataset} table={table_name}."
             )
-        return keys
+        return mapping

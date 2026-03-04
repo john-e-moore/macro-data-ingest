@@ -83,6 +83,35 @@ def test_fetch_line_codes_reads_parameter_values() -> None:
     assert client.fetch_line_codes("Regional", "SAPCE4") == ["1", "10"]
 
 
+def test_fetch_line_code_descriptions_reads_desc_values() -> None:
+    class DummyResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "BEAAPI": {
+                    "Results": {
+                        "ParamValue": [
+                            {"Key": "1", "Desc": "Personal consumption expenditures"},
+                            {"Key": "10", "Desc": "Food services and accommodations"},
+                        ]
+                    }
+                }
+            }
+
+    class DummySession:
+        def get(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            return DummyResponse()
+
+    client = BeaClient(api_key="abc-123")
+    client._session = DummySession()
+    assert client.fetch_line_code_descriptions("Regional", "SAPCE4") == {
+        "1": "Personal consumption expenditures",
+        "10": "Food services and accommodations",
+    }
+
+
 def test_fetch_retries_transient_429() -> None:
     class DummyResponse429:
         status_code = 429
