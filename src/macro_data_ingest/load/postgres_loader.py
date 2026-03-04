@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 import json
 import re
 from datetime import datetime, timezone
@@ -48,7 +49,11 @@ class PostgresLoader:
             state_fips TEXT NOT NULL,
             state_abbrev TEXT NOT NULL,
             geo_name TEXT NOT NULL,
+            frequency TEXT NOT NULL,
+            period_code TEXT NOT NULL,
             year INTEGER NOT NULL,
+            month INTEGER NULL,
+            quarter INTEGER NULL,
             line_code TEXT NOT NULL,
             series_code TEXT NOT NULL,
             series_name TEXT NOT NULL,
@@ -61,6 +66,30 @@ class PostgresLoader:
             run_id TEXT NOT NULL,
             loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             PRIMARY KEY (bea_table_name, state_fips, year, line_code)
+        );
+
+        CREATE TABLE IF NOT EXISTS {schema_gold}.pce_state_monthly (
+            bea_table_name TEXT NOT NULL,
+            state_fips TEXT NOT NULL,
+            state_abbrev TEXT NOT NULL,
+            geo_name TEXT NOT NULL,
+            frequency TEXT NOT NULL,
+            period_code TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            month INTEGER NOT NULL,
+            quarter INTEGER NULL,
+            line_code TEXT NOT NULL,
+            series_code TEXT NOT NULL,
+            series_name TEXT NOT NULL,
+            function_name TEXT NOT NULL,
+            pce_value DOUBLE PRECISION NOT NULL,
+            pce_value_scaled DOUBLE PRECISION NOT NULL,
+            unit TEXT NOT NULL,
+            unit_mult INTEGER NOT NULL,
+            note_ref TEXT NULL,
+            run_id TEXT NOT NULL,
+            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (bea_table_name, state_fips, period_code, line_code)
         );
 
         CREATE TABLE IF NOT EXISTS {schema_gold}.dim_source (
@@ -145,8 +174,30 @@ class PostgresLoader:
             conn.execute(text(ddl))
 
     @staticmethod
-    def _annual_period_bounds(year: int) -> tuple[str, str]:
-        return f"{year:04d}-01-01", f"{year:04d}-12-31"
+    def _period_bounds(
+        frequency: str,
+        period_code: str,
+        year: int,
+        month: int | None,
+        quarter: int | None,
+    ) -> tuple[str, str, int | None, int | None]:
+        normalized_frequency = frequency.strip().upper()
+        if normalized_frequency == "A":
+            return f"{year:04d}-01-01", f"{year:04d}-12-31", None, None
+        if normalized_frequency == "M":
+            month_value = month
+            if month_value is None:
+                match = re.fullmatch(r"\d{4}M(0[1-9]|1[0-2])", period_code.strip().upper())
+                if not match:
+                    raise ValueError(
+                        f"Invalid monthly period_code={period_code}; expected YYYYMmm format."
+                    )
+                month_value = int(match.group(1))
+            period_start = f"{year:04d}-{month_value:02d}-01"
+            day_count = calendar.monthrange(year, month_value)[1]
+            period_end = f"{year:04d}-{month_value:02d}-{day_count:02d}"
+            return period_start, period_end, month_value, None
+        raise ValueError(f"Unsupported frequency for conformed load: {frequency}")
 
     @staticmethod
     def _chunked(records: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
@@ -172,6 +223,8 @@ class PostgresLoader:
             "frequency",
             "period_code",
             "year",
+            "month",
+            "quarter",
             "state_fips",
             "state_abbrev",
             "geo_name",
@@ -291,7 +344,26 @@ class PostgresLoader:
             periods = conformed_frame[["frequency", "period_code", "year"]].drop_duplicates()
             period_params: list[dict[str, Any]] = []
             for row in periods.itertuples(index=False):
-                period_start, period_end = self._annual_period_bounds(int(row.year))
+                period_rows = conformed_frame[
+                    (conformed_frame["frequency"] == row.frequency)
+                    & (conformed_frame["period_code"] == row.period_code)
+                ][["month", "quarter"]]
+                month_value: int | None = None
+                quarter_value: int | None = None
+                if not period_rows.empty:
+                    month_raw = period_rows["month"].dropna()
+                    quarter_raw = period_rows["quarter"].dropna()
+                    if not month_raw.empty:
+                        month_value = int(month_raw.iloc[0])
+                    if not quarter_raw.empty:
+                        quarter_value = int(quarter_raw.iloc[0])
+                period_start, period_end, month_value, quarter_value = self._period_bounds(
+                    str(row.frequency),
+                    str(row.period_code),
+                    int(row.year),
+                    month_value,
+                    quarter_value,
+                )
                 period_params.append(
                     {
                         "frequency": str(row.frequency),
@@ -299,6 +371,8 @@ class PostgresLoader:
                         "period_start_date": period_start,
                         "period_end_date": period_end,
                         "year": int(row.year),
+                        "month": month_value,
+                        "quarter": quarter_value,
                     }
                 )
             if period_params:
@@ -321,8 +395,8 @@ class PostgresLoader:
                             :period_start_date,
                             :period_end_date,
                             :year,
-                            NULL,
-                            NULL,
+                            :quarter,
+                            :month,
                             TRUE
                         )
                         ON CONFLICT (frequency, period_code)

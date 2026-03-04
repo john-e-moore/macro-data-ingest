@@ -111,7 +111,9 @@ Recommended optional secrets (override defaults when needed):
 - `BEA_START_YEAR` (default `2000`; ingestion requests this year through current year)
 
 `config/datasets.yaml` is the canonical source for daily runs. By default it includes
-`SAPCE4` with `line_code: ALL`, so all SAPCE4 functions are ingested on each run.
+annual `SAPCE4` with `line_code: ALL`, so all SAPCE4 functions are ingested on each run.
+It also includes a disabled monthly SAPCE4 entry staged for future enablement once BEA
+returns monthly `TimePeriod` rows for the selected table.
 
 ## Standardized Backfills
 

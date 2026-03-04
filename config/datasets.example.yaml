@@ -10,3 +10,14 @@ datasets:
     geo_fips: STATE
     target_table: pce_state_annual
     enabled: true
+  - dataset_id: pce_state_sapce4_monthly
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAPCE4
+    bea_frequency: M
+    bea_start_year: 2019
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_monthly
+    enabled: false

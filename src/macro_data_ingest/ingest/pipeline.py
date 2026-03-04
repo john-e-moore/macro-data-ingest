@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -145,6 +146,31 @@ def _source_release_tag(payload: dict[str, Any]) -> str | None:
     return None
 
 
+def _period_frequency(time_period: Any) -> str:
+    value = str(time_period or "").strip().upper()
+    if re.fullmatch(r"\d{4}M(0[1-9]|1[0-2])", value):
+        return "M"
+    if re.fullmatch(r"\d{4}Q[1-4]", value):
+        return "Q"
+    if re.fullmatch(r"\d{4}", value):
+        return "A"
+    return "UNKNOWN"
+
+
+def _validate_requested_frequency(rows: list[dict[str, Any]], requested_frequency: str) -> None:
+    normalized = requested_frequency.strip().upper()
+    if normalized not in {"A", "M"}:
+        return
+    observed = {_period_frequency(row.get("TimePeriod")) for row in rows}
+    if normalized in observed:
+        return
+    raise ValueError(
+        "BEA response did not include the requested frequency "
+        f"{normalized}. Observed frequencies={sorted(observed)}. "
+        "Verify table/frequency availability in BEA metadata."
+    )
+
+
 def run_ingest(
     config: AppConfig,
     run_id: str,
@@ -169,6 +195,7 @@ def run_ingest(
             f"dataset={query.dataset} table={query.table_name} year={query.year} "
             f"geo_fips={query.geo_fips} line_code={query.line_code}."
         )
+    _validate_requested_frequency(rows, dataset_spec.bea_frequency)
     payload_hash = stable_rows_hash(rows)
 
     writer = BronzeWriter(

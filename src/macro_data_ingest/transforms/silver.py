@@ -71,6 +71,19 @@ def _parse_line_code(series_code: str) -> str:
     return series_code
 
 
+def _parse_time_period(time_period: str) -> tuple[str, int | None, int | None, int | None]:
+    value = str(time_period).strip().upper()
+    if re.fullmatch(r"\d{4}", value):
+        return "A", int(value), None, None
+    monthly_match = re.fullmatch(r"(\d{4})M(0[1-9]|1[0-2])", value)
+    if monthly_match:
+        return "M", int(monthly_match.group(1)), int(monthly_match.group(2)), None
+    quarterly_match = re.fullmatch(r"(\d{4})Q([1-4])", value)
+    if quarterly_match:
+        return "Q", int(quarterly_match.group(1)), None, int(quarterly_match.group(2))
+    return "", None, None, None
+
+
 def _split_function_name(raw_function_name: str) -> tuple[str, str]:
     label = str(raw_function_name or "").strip()
     if not label:
@@ -85,7 +98,11 @@ def _split_function_name(raw_function_name: str) -> tuple[str, str]:
     return series_name, function_name
 
 
-def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.DataFrame:
+def to_silver_frame(
+    raw_payload: dict,
+    bea_table_name: str | None = None,
+    bea_frequency: str | None = None,
+) -> pd.DataFrame:
     """Convert raw BEA payload into typed Silver records for state-level rows."""
     rows = raw_payload.get("BEAAPI", {}).get("Results", {}).get("Data", [])
     if not rows:
@@ -94,7 +111,11 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
                 "state_fips",
                 "state_abbrev",
                 "geo_name",
+                "frequency",
+                "period_code",
                 "year",
+                "month",
+                "quarter",
                 "bea_table_name",
                 "line_code",
                 "series_code",
@@ -113,7 +134,22 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
     # Keep only state + DC rows for this slice.
     frame = frame[frame["state_abbrev"].notna()].copy()
 
-    frame["year"] = pd.to_numeric(frame["TimePeriod"], errors="coerce").astype("Int64")
+    period_parts = frame["TimePeriod"].astype(str).map(_parse_time_period)
+    frame["frequency"] = period_parts.str[0]
+    frame["year"] = pd.to_numeric(period_parts.str[1], errors="coerce").astype("Int64")
+    frame["month"] = pd.to_numeric(period_parts.str[2], errors="coerce").astype("Int64")
+    frame["quarter"] = pd.to_numeric(period_parts.str[3], errors="coerce").astype("Int64")
+    frame = frame[frame["frequency"].isin(["A", "M"]) & frame["year"].notna()].copy()
+    requested_frequency = str(bea_frequency or "").strip().upper()
+    if requested_frequency in {"A", "M"}:
+        frame = frame[frame["frequency"] == requested_frequency].copy()
+    frame["period_code"] = frame["year"].astype("Int64").astype(str)
+    monthly_mask = frame["frequency"] == "M"
+    frame.loc[monthly_mask, "period_code"] = (
+        frame.loc[monthly_mask, "year"].astype("Int64").astype(str)
+        + "M"
+        + frame.loc[monthly_mask, "month"].astype("Int64").astype(str).str.zfill(2)
+    )
     frame["line_code"] = frame["Code"].astype(str).map(_parse_line_code)
     if bea_table_name is not None:
         frame["bea_table_name"] = str(bea_table_name).strip().upper()
@@ -134,7 +170,11 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
             "state_fips",
             "state_abbrev",
             "GeoName",
+            "frequency",
+            "period_code",
             "year",
+            "month",
+            "quarter",
             "bea_table_name",
             "line_code",
             "Code",
@@ -158,7 +198,7 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
     silver["series_name"] = silver["series_name"].fillna("").astype(str)
     silver["function_name"] = silver["function_name"].fillna("").astype(str)
     silver = silver.sort_values(
-        ["bea_table_name", "year", "state_fips", "line_code"]
+        ["bea_table_name", "period_code", "state_fips", "line_code"]
     ).reset_index(drop=True)
     return silver
 
@@ -170,6 +210,8 @@ def validate_silver_frame(frame: pd.DataFrame) -> None:
     required_not_null = [
         "state_fips",
         "state_abbrev",
+        "frequency",
+        "period_code",
         "year",
         "bea_table_name",
         "line_code",
@@ -180,6 +222,8 @@ def validate_silver_frame(frame: pd.DataFrame) -> None:
     if bad_cols:
         raise ValueError(f"Silver frame has nulls in required columns: {bad_cols}")
 
-    dupes = frame.duplicated(subset=["bea_table_name", "state_fips", "year", "line_code"]).sum()
+    dupes = frame.duplicated(
+        subset=["bea_table_name", "state_fips", "period_code", "line_code"]
+    ).sum()
     if dupes > 0:
         raise ValueError(f"Silver frame has duplicate primary keys: {dupes}")

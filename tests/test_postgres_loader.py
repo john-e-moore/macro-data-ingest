@@ -13,6 +13,16 @@ def test_validate_identifier_rejects_unsafe_names() -> None:
 
 
 def test_annual_period_bounds_uses_calendar_year() -> None:
-    start, end = PostgresLoader._annual_period_bounds(2024)
+    start, end, month, quarter = PostgresLoader._period_bounds("A", "2024", 2024, None, None)
     assert start == "2024-01-01"
     assert end == "2024-12-31"
+    assert month is None
+    assert quarter is None
+
+
+def test_monthly_period_bounds_uses_calendar_month() -> None:
+    start, end, month, quarter = PostgresLoader._period_bounds("M", "2024M02", 2024, 2, None)
+    assert start == "2024-02-01"
+    assert end == "2024-02-29"
+    assert month == 2
+    assert quarter is None
