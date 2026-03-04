@@ -76,6 +76,11 @@ Expected provisioning outputs:
 - CloudWatch log group names
 - Optional SNS topic ARN
 
+Postgres objects created/refreshed by load include:
+- Conformed `gold` model (`dim_source`, `dim_geo`, `dim_period`, `dim_series`, `dim_vintage`, `fact_macro_observation`)
+- Compatibility `gold.pce_state_annual`
+- Serving views (`serving.obt_state_macro_annual_latest`, `serving.v_macro_yoy`, `serving.v_pce_state_yoy`)
+
 Copy these outputs into:
 - local `.env`
 - GitHub repository secrets for workflows

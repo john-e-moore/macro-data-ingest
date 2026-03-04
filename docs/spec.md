@@ -6,8 +6,8 @@
 2. Persist immutable raw payloads and request metadata to Bronze S3 paths.
 3. Transform Bronze data into typed and normalized Silver tables.
 4. Model Silver data into analytics-ready Gold outputs (Parquet preferred).
-5. Load curated Gold data into Postgres with idempotent upsert behavior.
-6. Create/refresh serving views for common derivatives (YoY, MoM, rolling windows where applicable).
+5. Load curated Gold data into Postgres conformed dimensions and fact tables with idempotent upsert behavior.
+6. Create/refresh denormalized serving views (OBT-style) for common derivatives (YoY, MoM, rolling windows where applicable).
 7. Execute daily via GitHub Actions with manual run support.
 8. Reprocess only when source data changes (hash/vintage/checkpoint detection).
 
@@ -21,6 +21,8 @@
   - Structured logs with run identifiers and stage-level context.
 - **Data Quality**
   - Row-count, non-null key, schema, and uniqueness checks.
+- **Model Stability**
+  - Conformed dimensional contracts in `gold`; consumer-oriented denormalized contracts in `serving`.
 - **Security**
   - No secrets in repo; encrypted storage and least-privilege IAM.
 - **Cost Control**

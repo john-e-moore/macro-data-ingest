@@ -91,6 +91,24 @@ Use an ExecPlan by default for work that:
 - Record lineage metadata (source params, hashes, partitions, row counts) per run.
 - Favor deterministic file and partition naming.
 
+## Data Modeling Strategy (Postgres)
+
+Agents should treat this as the default modeling contract unless a user request overrides it:
+
+- `gold` is the semantic system of record and must maintain conformed dimensions + fact:
+  - `gold.dim_source`
+  - `gold.dim_geo`
+  - `gold.dim_period`
+  - `gold.dim_series`
+  - `gold.dim_vintage`
+  - `gold.fact_macro_observation`
+- `serving` is the consumer contract layer and should expose denormalized OBT/views for common
+  query paths (`serving.obt_state_macro_annual_latest`, YoY/MoM derivatives).
+- Legacy BEA-specific tables/views may be kept for backward compatibility but should be treated as
+  compatibility surfaces, not the long-term semantic core.
+- Cross-source joins (BEA/BLS/Census/IRS) should happen through conformed dimensions/fact and only
+  then be published to `serving`.
+
 ## Validation Expectations
 
 Before claiming completion, validate with:

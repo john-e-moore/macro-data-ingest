@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -14,7 +15,7 @@ from macro_data_ingest.config import AppConfig
 from macro_data_ingest.datasets import BeaDatasetSpec
 from macro_data_ingest.load.postgres_loader import PostgresLoader
 from macro_data_ingest.run_metadata import utc_now_iso
-from macro_data_ingest.transforms.gold import to_gold_frame
+from macro_data_ingest.transforms.gold import to_conformed_observation_frame, to_gold_frame
 
 LOGGER = logging.getLogger(__name__)
 
@@ -76,6 +77,13 @@ def _build_dsn(config: AppConfig) -> str:
     )
 
 
+def _extract_vintage_tag_from_silver_key(silver_key: str) -> str:
+    match = re.search(r"extract_date=(\d{4}-\d{2}-\d{2})", silver_key)
+    if not match:
+        raise ValueError(f"Could not derive vintage tag from Silver key: {silver_key}")
+    return match.group(1)
+
+
 def run_load(
     config: AppConfig,
     run_id: str,
@@ -102,6 +110,13 @@ def run_load(
     gold_frame = to_gold_frame(silver_frame)
     if gold_frame.empty:
         raise ValueError("Gold frame is empty; cannot load to Postgres.")
+    vintage_tag = _extract_vintage_tag_from_silver_key(silver_key)
+    conformed_frame = to_conformed_observation_frame(
+        gold_frame,
+        source_name=dataset_spec.source,
+        dataset_id=dataset_spec.dataset_id,
+        vintage_tag=vintage_tag,
+    )
     gold_frame["run_id"] = run_id
 
     loader = PostgresLoader(
@@ -114,6 +129,11 @@ def run_load(
         table_name=dataset_spec.target_table,
         frame=gold_frame,
         pk_cols=["bea_table_name", "state_fips", "year", "line_code"],
+    )
+    loader.upsert_conformed_observations(
+        conformed_frame=conformed_frame,
+        run_id=run_id,
+        source_release_tag=None,
     )
     loader.create_or_replace_views()
     loader.record_run(
@@ -145,7 +165,11 @@ def run_load(
         "input_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
         "row_count": int(len(gold_frame)),
         "target_table": f"{config.pg_schema_gold}.{dataset_spec.target_table}",
-        "target_view": "serving.v_pce_state_yoy",
+        "target_views": [
+            "serving.obt_state_macro_annual_latest",
+            "serving.v_macro_yoy",
+            "serving.v_pce_state_yoy",
+        ],
     }
     manifest_key = (
         f"{config.s3_prefix_root}/gold/{source}/{dataset}/"
