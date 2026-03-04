@@ -20,6 +20,8 @@ def test_to_gold_frame_projects_expected_columns() -> None:
                 "series_code": "SAPCE3-1",
                 "series_name": "Total personal consumption expenditures",
                 "function_name": "Personal consumption expenditures",
+                "raw_description": "Personal consumption expenditures",
+                "hierarchy_path_json": '["Personal consumption expenditures"]',
                 "value": 100.0,
                 "unit": "Millions of current dollars",
                 "unit_mult": 6,
@@ -59,6 +61,8 @@ def test_to_conformed_observation_frame_projects_conformed_keys() -> None:
                 "series_code": "SAPCE4-1",
                 "series_name": "Total personal consumption expenditures",
                 "function_name": "Personal consumption expenditures",
+                "raw_description": "[SAPCE4] Total personal consumption expenditures: Personal consumption expenditures",
+                "hierarchy_path_json": '["Total personal consumption expenditures", "Personal consumption expenditures"]',
                 "pce_value": 100.0,
                 "pce_value_scaled": 100000000.0,
                 "unit": "Millions of current dollars",
@@ -79,3 +83,5 @@ def test_to_conformed_observation_frame_projects_conformed_keys() -> None:
     assert conformed.iloc[0]["period_code"] == "2024M02"
     assert conformed.iloc[0]["month"] == 2
     assert conformed.iloc[0]["vintage_tag"] == "2026-03-04"
+    assert conformed.iloc[0]["raw_description"].startswith("[SAPCE4]")
+    assert "Personal consumption expenditures" in conformed.iloc[0]["hierarchy_path_json"]

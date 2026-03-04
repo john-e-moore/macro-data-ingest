@@ -58,6 +58,8 @@ class PostgresLoader:
             series_code TEXT NOT NULL,
             series_name TEXT NOT NULL,
             function_name TEXT NOT NULL,
+            raw_description TEXT NOT NULL DEFAULT '',
+            hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
             pce_value DOUBLE PRECISION NOT NULL,
             pce_value_scaled DOUBLE PRECISION NOT NULL,
             unit TEXT NOT NULL,
@@ -82,6 +84,8 @@ class PostgresLoader:
             series_code TEXT NOT NULL,
             series_name TEXT NOT NULL,
             function_name TEXT NOT NULL,
+            raw_description TEXT NOT NULL DEFAULT '',
+            hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
             pce_value DOUBLE PRECISION NOT NULL,
             pce_value_scaled DOUBLE PRECISION NOT NULL,
             unit TEXT NOT NULL,
@@ -137,11 +141,36 @@ class PostgresLoader:
             series_code TEXT NOT NULL,
             series_name TEXT NOT NULL,
             function_name TEXT NOT NULL,
+            raw_description TEXT NOT NULL DEFAULT '',
+            hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
+            parse_strategy TEXT NOT NULL DEFAULT 'colon_path',
             unit TEXT NOT NULL,
             unit_mult INTEGER NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE (source_id, series_code)
+        );
+
+        CREATE TABLE IF NOT EXISTS {schema_gold}.dim_series_node (
+            node_id BIGSERIAL PRIMARY KEY,
+            source_id BIGINT NOT NULL REFERENCES {schema_gold}.dim_source(source_id),
+            bea_table_name TEXT NOT NULL,
+            node_key TEXT NOT NULL,
+            node_label TEXT NOT NULL,
+            node_level INTEGER NOT NULL,
+            parent_node_id BIGINT NULL REFERENCES {schema_gold}.dim_series_node(node_id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (source_id, bea_table_name, node_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS {schema_gold}.bridge_series_node (
+            series_id BIGINT NOT NULL REFERENCES {schema_gold}.dim_series(series_id),
+            node_id BIGINT NOT NULL REFERENCES {schema_gold}.dim_series_node(node_id),
+            path_ordinal INTEGER NOT NULL,
+            is_leaf BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (series_id, node_id)
         );
 
         CREATE TABLE IF NOT EXISTS {schema_gold}.dim_vintage (
@@ -172,6 +201,22 @@ class PostgresLoader:
         """
         with self.engine.begin() as conn:
             conn.execute(text(ddl))
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                        ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
+                        ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]';
+                    ALTER TABLE {schema_gold}.pce_state_monthly
+                        ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
+                        ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]';
+                    ALTER TABLE {schema_gold}.dim_series
+                        ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
+                        ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
+                        ADD COLUMN IF NOT EXISTS parse_strategy TEXT NOT NULL DEFAULT 'colon_path';
+                    """
+                )
+            )
 
     @staticmethod
     def _period_bounds(
@@ -205,6 +250,165 @@ class PostgresLoader:
             raise ValueError("Chunk size must be positive.")
         return [records[idx : idx + size] for idx in range(0, len(records), size)]
 
+    @staticmethod
+    def _parse_hierarchy_path(
+        raw_path_json: str, function_name: str, series_name: str, line_code: str
+    ) -> list[str]:
+        try:
+            parsed = json.loads(str(raw_path_json or "[]"))
+        except json.JSONDecodeError:
+            parsed = []
+        if isinstance(parsed, list):
+            path = [str(item).strip() for item in parsed if str(item).strip()]
+            if path:
+                return path
+
+        fallback_leaf = str(function_name).strip() or str(series_name).strip() or str(line_code).strip()
+        return [fallback_leaf] if fallback_leaf else []
+
+    def _sync_series_hierarchy(
+        self,
+        conn: Any,
+        *,
+        schema_gold: str,
+        source_id: int,
+        table_name: str,
+    ) -> None:
+        series_rows = conn.execute(
+            text(
+                f"""
+                SELECT
+                    series_id,
+                    line_code,
+                    series_name,
+                    function_name,
+                    hierarchy_path_json
+                FROM {schema_gold}.dim_series
+                WHERE source_id = :source_id
+                  AND bea_table_name = :table_name;
+                """
+            ),
+            {"source_id": source_id, "table_name": table_name},
+        ).fetchall()
+        if not series_rows:
+            return
+
+        node_rows = conn.execute(
+            text(
+                f"""
+                SELECT node_id, node_key
+                FROM {schema_gold}.dim_series_node
+                WHERE source_id = :source_id
+                  AND bea_table_name = :table_name;
+                """
+            ),
+            {"source_id": source_id, "table_name": table_name},
+        ).fetchall()
+        node_key_to_id = {str(node_key): int(node_id) for node_id, node_key in node_rows}
+
+        series_ids = [int(row.series_id) for row in series_rows]
+        conn.execute(
+            text(
+                f"""
+                DELETE FROM {schema_gold}.bridge_series_node
+                WHERE series_id = ANY(:series_ids);
+                """
+            ),
+            {"series_ids": series_ids},
+        )
+
+        bridge_params: list[dict[str, Any]] = []
+        for row in series_rows:
+            series_id = int(row.series_id)
+            path = self._parse_hierarchy_path(
+                str(row.hierarchy_path_json or "[]"),
+                str(row.function_name or ""),
+                str(row.series_name or ""),
+                str(row.line_code or ""),
+            )
+            parent_id: int | None = None
+            node_path_parts: list[str] = []
+            for level, node_label in enumerate(path, start=1):
+                node_path_parts.append(node_label)
+                node_key = "||".join(node_path_parts)
+                node_id = node_key_to_id.get(node_key)
+                if node_id is None:
+                    inserted = conn.execute(
+                        text(
+                            f"""
+                            INSERT INTO {schema_gold}.dim_series_node (
+                                source_id,
+                                bea_table_name,
+                                node_key,
+                                node_label,
+                                node_level,
+                                parent_node_id
+                            )
+                            VALUES (
+                                :source_id,
+                                :bea_table_name,
+                                :node_key,
+                                :node_label,
+                                :node_level,
+                                :parent_node_id
+                            )
+                            ON CONFLICT (source_id, bea_table_name, node_key)
+                            DO UPDATE
+                            SET
+                                node_label = EXCLUDED.node_label,
+                                node_level = EXCLUDED.node_level,
+                                parent_node_id = EXCLUDED.parent_node_id,
+                                updated_at = NOW()
+                            RETURNING node_id;
+                            """
+                        ),
+                        {
+                            "source_id": source_id,
+                            "bea_table_name": table_name,
+                            "node_key": node_key,
+                            "node_label": node_label,
+                            "node_level": level,
+                            "parent_node_id": parent_id,
+                        },
+                    ).first()
+                    node_id = int(inserted[0])
+                    node_key_to_id[node_key] = node_id
+                parent_id = node_id
+                bridge_params.append(
+                    {
+                        "series_id": series_id,
+                        "node_id": node_id,
+                        "path_ordinal": level,
+                        "is_leaf": level == len(path),
+                    }
+                )
+
+        if bridge_params:
+            conn.execute(
+                text(
+                    f"""
+                    INSERT INTO {schema_gold}.bridge_series_node (
+                        series_id,
+                        node_id,
+                        path_ordinal,
+                        is_leaf
+                    )
+                    VALUES (
+                        :series_id,
+                        :node_id,
+                        :path_ordinal,
+                        :is_leaf
+                    )
+                    ON CONFLICT (series_id, node_id)
+                    DO UPDATE
+                    SET
+                        path_ordinal = EXCLUDED.path_ordinal,
+                        is_leaf = EXCLUDED.is_leaf;
+                    """
+                ),
+                bridge_params,
+            )
+
     def upsert_conformed_observations(
         self,
         conformed_frame: pd.DataFrame,
@@ -232,6 +436,8 @@ class PostgresLoader:
             "series_code",
             "series_name",
             "function_name",
+            "raw_description",
+            "hierarchy_path_json",
             "unit",
             "unit_mult",
             "vintage_tag",
@@ -418,6 +624,8 @@ class PostgresLoader:
                     "series_code",
                     "series_name",
                     "function_name",
+                    "raw_description",
+                    "hierarchy_path_json",
                     "unit",
                     "unit_mult",
                 ]
@@ -432,6 +640,9 @@ class PostgresLoader:
                         "series_code": str(row.series_code),
                         "series_name": str(row.series_name),
                         "function_name": str(row.function_name),
+                        "raw_description": str(row.raw_description),
+                        "hierarchy_path_json": str(row.hierarchy_path_json),
+                        "parse_strategy": "colon_path",
                         "unit": str(row.unit),
                         "unit_mult": int(row.unit_mult),
                     }
@@ -447,6 +658,9 @@ class PostgresLoader:
                             series_code,
                             series_name,
                             function_name,
+                            raw_description,
+                            hierarchy_path_json,
+                            parse_strategy,
                             unit,
                             unit_mult
                         )
@@ -457,6 +671,9 @@ class PostgresLoader:
                             :series_code,
                             :series_name,
                             :function_name,
+                            :raw_description,
+                            :hierarchy_path_json,
+                            :parse_strategy,
                             :unit,
                             :unit_mult
                         )
@@ -467,6 +684,9 @@ class PostgresLoader:
                             line_code = EXCLUDED.line_code,
                             series_name = EXCLUDED.series_name,
                             function_name = EXCLUDED.function_name,
+                            raw_description = EXCLUDED.raw_description,
+                            hierarchy_path_json = EXCLUDED.hierarchy_path_json,
+                            parse_strategy = EXCLUDED.parse_strategy,
                             unit = EXCLUDED.unit,
                             unit_mult = EXCLUDED.unit_mult,
                             updated_at = NOW();
@@ -474,6 +694,12 @@ class PostgresLoader:
                     ),
                     series_params,
                 )
+            self._sync_series_hierarchy(
+                conn,
+                schema_gold=schema_gold,
+                source_id=source_id,
+                table_name=table_name,
+            )
 
             geo_rows = conn.execute(
                 text(
@@ -623,6 +849,8 @@ class PostgresLoader:
             s.series_code,
             s.series_name,
             s.function_name,
+            s.raw_description,
+            s.hierarchy_path_json,
             s.unit,
             s.unit_mult,
             v.vintage_tag,
@@ -656,6 +884,8 @@ class PostgresLoader:
             cur.series_code,
             cur.series_name,
             cur.function_name,
+            cur.raw_description,
+            cur.hierarchy_path_json,
             cur.year,
             cur.pce_value AS value_current,
             prev.pce_value AS value_prior,

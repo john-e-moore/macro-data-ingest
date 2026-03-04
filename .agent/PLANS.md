@@ -1428,3 +1428,122 @@ Interfaces:
 Dependencies:
 - BEA API `GetData` with `Frequency=M` support.
 - pandas transforms and SQLAlchemy-backed Postgres loader logic.
+
+---
+
+# ExecPlan: Hierarchy-capable series dimension for tiered BEA labels
+
+Links: branch `feature/bea-series-hierarchy-dim`; feature brief `.agent/features/2026-03-04-series-hierarchy-dim/SPEC.md`; PR URL `(pending)`.
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+## Purpose / Big Picture
+
+Enable the conformed model to represent tiered BEA line labels (for example SAPCE1 category paths) without breaking existing consumers that depend on flat `series_name` and `function_name`. The observable outcome is that each `dim_series` row stores canonical raw label + serialized hierarchy path, and the hierarchy can be queried through `dim_series_node` and `bridge_series_node`.
+
+## Progress
+
+- [x] (2026-03-04 00:00Z) Initial planning completed and scope pinned in feature brief.
+- [x] Transform contracts updated with raw/hierarchy metadata fields.
+- [x] Postgres DDL and conformed load updated for hierarchy node/bridge materialization.
+- [x] Validation completed (`make lint test PYTHON=.venv/bin/python` -> `50 passed`).
+- [ ] PR opened and linked.
+
+## Surprises & Discoveries
+
+- Observation: existing parser split at first colon only, which cannot represent 3+ tier descriptions.
+  Evidence: previous `_split_function_name` behavior in `src/macro_data_ingest/transforms/silver.py`.
+- Observation: no existing loader tests cover conformed dimension DDL updates.
+  Evidence: `tests/` validates parser/transforms and ingest helpers but not Postgres loader DDL execution.
+
+## Decision Log
+
+- Decision: keep `series_name` and `function_name` as backward-compatible convenience fields.
+  Rationale: avoids immediate serving contract disruption while adding canonical hierarchy support.
+  Date/Author: 2026-03-04, codex agent
+- Decision: store canonical path as `hierarchy_path_json` text in transforms/conformed model.
+  Rationale: stable across S3 parquet + Postgres ingestion without custom DB types.
+  Date/Author: 2026-03-04, codex agent
+- Decision: use deterministic `node_key` in `dim_series_node` (`level1||level2||...`) with unique constraint.
+  Rationale: simplifies idempotent upserts and avoids null-uniqueness pitfalls on root parent rows.
+  Date/Author: 2026-03-04, codex agent
+
+## Outcomes & Retrospective
+
+Implementation is complete for hierarchy-capable series metadata. Validation passed locally with
+`make lint test PYTHON=.venv/bin/python` (`All checks passed!`, `50 passed in 1.79s`). Remaining
+step is opening and linking the PR URL.
+
+## Context and Orientation
+
+Relevant paths:
+- `src/macro_data_ingest/transforms/series_labels.py`
+- `src/macro_data_ingest/transforms/silver.py`
+- `src/macro_data_ingest/transforms/gold.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `docs/architecture.md`
+- `tests/test_series_labels.py`
+- `tests/test_silver_transform.py`
+- `tests/test_gold_transform.py`
+
+## Plan of Work
+
+1. Add reusable BEA label parser returning compatibility fields and full hierarchy path.
+2. Carry raw description and hierarchy path through Silver -> Gold -> conformed frames.
+3. Extend Postgres schema for hierarchy metadata and hierarchy node/bridge tables.
+4. Populate hierarchy tables idempotently from `dim_series` on each conformed load.
+5. Update tests and docs.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+
+Expected outcomes:
+- lint/tests pass;
+- parser + transform tests cover multi-level hierarchy behavior;
+- no regressions in existing ingest/transform contracts.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- tiered labels parse into a full `hierarchy_path_json`.
+- `series_name`/`function_name` compatibility fields remain populated.
+- conformed loader includes hierarchy metadata in `dim_series`.
+- hierarchy node/bridge tables are created and upsert logic is idempotent.
+- docs reflect the expanded conformed model.
+
+## Idempotence and Recovery
+
+Idempotence:
+- `dim_series` upsert remains keyed on `(source_id, series_code)`.
+- `dim_series_node` upsert keyed on `(source_id, bea_table_name, node_key)`.
+- `bridge_series_node` is refreshed per-table by deleting target series bridges before reinsert.
+
+Recovery:
+- rerun `mdi load` for the dataset; hierarchy nodes/bridges converge deterministically.
+- if parsing strategy changes, rerun load to recompute bridge mappings.
+
+## Artifacts and Notes
+
+Artifacts:
+- `.agent/features/2026-03-04-series-hierarchy-dim/SPEC.md`
+- `src/macro_data_ingest/transforms/series_labels.py`
+- `src/macro_data_ingest/transforms/silver.py`
+- `src/macro_data_ingest/transforms/gold.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `tests/test_series_labels.py`
+- `tests/test_silver_transform.py`
+- `tests/test_gold_transform.py`
+- `docs/architecture.md`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- Silver output includes `raw_description` and `hierarchy_path_json`.
+- Gold/conformed frames propagate both fields to loader.
+- Postgres conformed model adds `gold.dim_series_node` and `gold.bridge_series_node`.
+
+Dependencies:
+- No new runtime dependencies.
+- Existing serving views remain compatible with additive hierarchy metadata.
