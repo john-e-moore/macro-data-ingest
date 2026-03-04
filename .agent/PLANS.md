@@ -175,7 +175,7 @@ Name libraries/services/modules used and any required interfaces or function sig
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/backfill-runbook-function-name`; feature brief `.agent/features/2026-03-04-backfill-runbook-function-name/SPEC.md`; PR `TBD`.
+Links: branch `feature/backfill-runbook-function-name`; feature brief `.agent/features/2026-03-04-backfill-runbook-function-name/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/5`.
 
 ## Purpose / Big Picture
 
