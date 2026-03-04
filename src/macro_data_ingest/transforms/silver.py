@@ -4,6 +4,8 @@ import re
 
 import pandas as pd
 
+from macro_data_ingest.transforms.series_labels import hierarchy_path_to_json, parse_bea_series_label
+
 STATE_FIPS_TO_ABBR = {
     "01": "AL",
     "02": "AK",
@@ -84,20 +86,6 @@ def _parse_time_period(time_period: str) -> tuple[str, int | None, int | None, i
     return "", None, None, None
 
 
-def _split_function_name(raw_function_name: str) -> tuple[str, str]:
-    label = str(raw_function_name or "").strip()
-    if not label:
-        return "", ""
-
-    if ":" not in label:
-        return "", label
-
-    left, right = label.split(":", maxsplit=1)
-    series_name = re.sub(r"^\[[^\]]+\]\s*", "", left).strip()
-    function_name = right.strip()
-    return series_name, function_name
-
-
 def to_silver_frame(
     raw_payload: dict,
     bea_table_name: str | None = None,
@@ -121,6 +109,8 @@ def to_silver_frame(
                 "series_code",
                 "series_name",
                 "function_name",
+                "raw_description",
+                "hierarchy_path_json",
                 "value",
                 "unit",
                 "unit_mult",
@@ -161,9 +151,11 @@ def to_silver_frame(
         frame["FunctionName"] = frame["LineDescription"]
     if "FunctionName" not in frame.columns:
         frame["FunctionName"] = ""
-    function_parts = frame["FunctionName"].fillna("").astype(str).map(_split_function_name)
+    frame["RawDescription"] = frame["FunctionName"].fillna("").astype(str)
+    function_parts = frame["RawDescription"].map(parse_bea_series_label)
     frame["SeriesName"] = function_parts.str[0]
     frame["FunctionName"] = function_parts.str[1]
+    frame["HierarchyPathJson"] = function_parts.str[2].map(hierarchy_path_to_json)
 
     silver = frame[
         [
@@ -180,6 +172,8 @@ def to_silver_frame(
             "Code",
             "SeriesName",
             "FunctionName",
+            "RawDescription",
+            "HierarchyPathJson",
             "value",
             "CL_UNIT",
             "unit_mult",
@@ -191,12 +185,16 @@ def to_silver_frame(
             "Code": "series_code",
             "SeriesName": "series_name",
             "FunctionName": "function_name",
+            "RawDescription": "raw_description",
+            "HierarchyPathJson": "hierarchy_path_json",
             "CL_UNIT": "unit",
             "NoteRef": "note_ref",
         }
     )
     silver["series_name"] = silver["series_name"].fillna("").astype(str)
     silver["function_name"] = silver["function_name"].fillna("").astype(str)
+    silver["raw_description"] = silver["raw_description"].fillna("").astype(str)
+    silver["hierarchy_path_json"] = silver["hierarchy_path_json"].fillna("[]").astype(str)
     silver = silver.sort_values(
         ["bea_table_name", "period_code", "state_fips", "line_code"]
     ).reset_index(drop=True)

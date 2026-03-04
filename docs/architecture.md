@@ -53,6 +53,8 @@ Typical objects:
 - `gold.dim_geo`
 - `gold.dim_period`
 - `gold.dim_series`
+- `gold.dim_series_node`
+- `gold.bridge_series_node`
 - `gold.dim_vintage`
 - `gold.fact_macro_observation`
 - `gold.pce_state_annual` (compatibility table during migration)
@@ -73,7 +75,9 @@ Dimension responsibilities:
 - `dim_source`: source + dataset identity (e.g., `BEA` + `pce_state_sapce4`)
 - `dim_geo`: geography keys (`state_fips`, `state_abbrev`, `geo_name`)
 - `dim_period`: period semantics (`frequency`, `period_code`, `year`, optional `month`/`quarter`, bounds)
-- `dim_series`: semantic measure identity (`series_code`, `line_code`, labels, units)
+- `dim_series`: semantic measure identity (`series_code`, `line_code`, compatibility labels, units, raw label)
+- `dim_series_node`: canonical hierarchical taxonomy nodes per BEA table
+- `bridge_series_node`: bridge linking each series to its full hierarchy path
 - `dim_vintage`: release/as-of tracking and `is_latest` selection flag
 
 ### Serving Model

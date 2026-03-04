@@ -58,6 +58,8 @@ def test_to_silver_frame_keeps_only_state_rows() -> None:
     assert silver.iloc[0]["bea_table_name"] == "SAPCE3"
     assert silver.iloc[0]["series_name"] == ""
     assert silver.iloc[0]["function_name"] == "Personal consumption expenditures"
+    assert silver.iloc[0]["raw_description"] == "Personal consumption expenditures"
+    assert silver.iloc[0]["hierarchy_path_json"] == '["Personal consumption expenditures"]'
 
 
 def test_validate_silver_frame_happy_path() -> None:
@@ -139,6 +141,37 @@ def test_to_silver_frame_splits_series_and_function_name() -> None:
     silver = to_silver_frame(payload, bea_table_name="SAPCE4")
     assert silver.iloc[0]["series_name"] == "Total personal consumption expenditures"
     assert silver.iloc[0]["function_name"] == "Life insurance"
+    assert silver.iloc[0]["hierarchy_path_json"] == (
+        '["Total personal consumption expenditures", "Life insurance"]'
+    )
+
+
+def test_to_silver_frame_parses_multi_level_hierarchy_path() -> None:
+    payload = {
+        "BEAAPI": {
+            "Results": {
+                "Data": [
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024",
+                        "Code": "SAPCE1-200",
+                        "FunctionName": "[SAPCE1] Goods: Durable goods: Motor vehicles and parts",
+                        "DataValue": "123.4",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    }
+                ]
+            }
+        }
+    }
+    silver = to_silver_frame(payload, bea_table_name="SAPCE1")
+    assert silver.iloc[0]["series_name"] == "Goods"
+    assert silver.iloc[0]["function_name"] == "Motor vehicles and parts"
+    assert silver.iloc[0]["hierarchy_path_json"] == (
+        '["Goods", "Durable goods", "Motor vehicles and parts"]'
+    )
 
 
 def test_to_silver_frame_parses_monthly_period_code() -> None:
