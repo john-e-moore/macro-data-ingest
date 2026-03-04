@@ -54,7 +54,7 @@ def load_config() -> AppConfig:
         github_repo=os.getenv("GITHUB_REPO", ""),
         bea_api_key=os.getenv("BEA_API_KEY", ""),
         bea_dataset=os.getenv("BEA_DATASET", "Regional"),
-        bea_table_name=os.getenv("BEA_TABLE_NAME", "SAPCE3"),
+        bea_table_name=os.getenv("BEA_TABLE_NAME", "SAPCE4"),
         bea_frequency=os.getenv("BEA_FREQUENCY", "A"),
         bea_start_year=int(os.getenv("BEA_START_YEAR", "2000")),
         datasets_config_path=os.getenv("DATASETS_CONFIG_PATH", "config/datasets.yaml"),

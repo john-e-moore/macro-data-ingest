@@ -228,7 +228,7 @@ def run_backfill(
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Backfill function_name values in gold.pce_state_annual.")
     parser.add_argument("--env", choices=["staging", "prod"], default="staging")
-    parser.add_argument("--tables", default="SAPCE3,SAPCE4")
+    parser.add_argument("--tables", default="SAPCE4")
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--force", action="store_true", help="Overwrite non-empty function_name values.")
     parser.add_argument("--dry-run", action="store_true", help="Compute stats only; do not update rows.")
