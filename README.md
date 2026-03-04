@@ -53,6 +53,7 @@ The CLI exposes pipeline commands:
 - `mdi transform --env staging --run-id <run_id>`
 - `mdi load --env staging --run-id <run_id>`
 - `mdi run-all --env staging --run-id <run_id>`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce1`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4_monthly`
 
@@ -61,12 +62,14 @@ By default, ingest requests BEA annual years from `BEA_START_YEAR` through curre
 ingest payload hash is unchanged.
 
 `run-all` reads `config/datasets.yaml` and processes each enabled dataset. The default config ingests:
+- `pce_state_sapce1` (annual SAPCE1, `bea_frequency: A`)
 - `pce_state_sapce4` (annual SAPCE4, `bea_frequency: A`)
 
 The repo also includes a staged monthly config entry:
 - `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)
 
-Both use `line_code: ALL`, so all SAPCE4 function categories are ingested for each enabled grain.
+Both annual datasets use `line_code: ALL`, so all function categories for each configured BEA table
+are ingested for the enabled grain.
 The monthly entry is disabled until BEA returns `TimePeriod` values at monthly grain for the requested table.
 
 These commands are implemented end-to-end for staging and can be used in GitHub Actions
