@@ -205,15 +205,54 @@ class PostgresLoader:
                 text(
                     f"""
                     ALTER TABLE {schema_gold}.pce_state_annual
+                        ADD COLUMN IF NOT EXISTS frequency TEXT,
+                        ADD COLUMN IF NOT EXISTS period_code TEXT,
+                        ADD COLUMN IF NOT EXISTS month INTEGER NULL,
+                        ADD COLUMN IF NOT EXISTS quarter INTEGER NULL,
                         ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
                         ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]';
                     ALTER TABLE {schema_gold}.pce_state_monthly
+                        ADD COLUMN IF NOT EXISTS frequency TEXT,
+                        ADD COLUMN IF NOT EXISTS period_code TEXT,
+                        ADD COLUMN IF NOT EXISTS month INTEGER NULL,
+                        ADD COLUMN IF NOT EXISTS quarter INTEGER NULL,
                         ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
                         ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]';
                     ALTER TABLE {schema_gold}.dim_series
                         ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
                         ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
                         ADD COLUMN IF NOT EXISTS parse_strategy TEXT NOT NULL DEFAULT 'colon_path';
+
+                    UPDATE {schema_gold}.pce_state_annual
+                    SET
+                        frequency = COALESCE(NULLIF(frequency, ''), 'A'),
+                        period_code = COALESCE(NULLIF(period_code, ''), year::TEXT)
+                    WHERE frequency IS NULL
+                       OR frequency = ''
+                       OR period_code IS NULL
+                       OR period_code = '';
+
+                    UPDATE {schema_gold}.pce_state_monthly
+                    SET
+                        frequency = COALESCE(NULLIF(frequency, ''), 'M'),
+                        period_code = COALESCE(
+                            NULLIF(period_code, ''),
+                            CASE
+                                WHEN month IS NOT NULL THEN year::TEXT || 'M' || LPAD(month::TEXT, 2, '0')
+                                ELSE year::TEXT
+                            END
+                        )
+                    WHERE frequency IS NULL
+                       OR frequency = ''
+                       OR period_code IS NULL
+                       OR period_code = '';
+
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                        ALTER COLUMN frequency SET NOT NULL,
+                        ALTER COLUMN period_code SET NOT NULL;
+                    ALTER TABLE {schema_gold}.pce_state_monthly
+                        ALTER COLUMN frequency SET NOT NULL,
+                        ALTER COLUMN period_code SET NOT NULL;
                     """
                 )
             )
