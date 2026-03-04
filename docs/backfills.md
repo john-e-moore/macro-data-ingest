@@ -33,7 +33,7 @@ Current metadata backfill utility:
 ## Metadata Backfill: `function_name`
 
 This is the recommended path when `gold.pce_state_annual` has missing or stale
-`function_name` values and source numeric values are already correct.
+`series_name` / `function_name` values and source numeric values are already correct.
 
 ### Dry run
 
@@ -55,8 +55,10 @@ python scripts/backfill_function_names.py \
 ```
 
 Notes:
-- Default behavior updates only rows where `function_name` is blank/null.
-- Use `--force` to overwrite existing non-empty values.
+- Default behavior updates rows where either `series_name` or `function_name` is blank/null.
+- Existing labels that still contain the legacy composite format (`[TABLE] Series: Function`)
+  are normalized into `series_name` + `function_name`.
+- Use `--force` to overwrite existing non-empty values from API metadata.
 - The script records a `meta.ingest_runs` entry with `stage=backfill`.
 
 ## Validation Queries
@@ -66,6 +68,7 @@ Run after backfill:
 ```sql
 SELECT bea_table_name, year,
        COUNT(*) AS rows,
+       COUNT(*) FILTER (WHERE COALESCE(series_name, '') <> '') AS non_empty_series_name,
        COUNT(*) FILTER (WHERE COALESCE(function_name, '') <> '') AS non_empty_function_name
 FROM gold.pce_state_annual
 GROUP BY bea_table_name, year
@@ -73,7 +76,7 @@ ORDER BY bea_table_name, year DESC;
 ```
 
 ```sql
-SELECT bea_table_name, line_code, function_name
+SELECT bea_table_name, line_code, series_name, function_name
 FROM gold.pce_state_annual
 WHERE bea_table_name = 'SAPCE4'
   AND line_code IN ('37')   -- Health
@@ -81,8 +84,9 @@ LIMIT 10;
 ```
 
 Expected outcomes:
+- `non_empty_series_name == rows` for intended scope.
 - `non_empty_function_name == rows` for intended scope.
-- Known SAPCE4 labels (for example line `37`) show expected value (`Health`).
+- Known SAPCE4 labels (for example line `37`) show expected values (`Total personal consumption expenditures` + `Health`).
 
 ## Recovery and Retry
 

@@ -54,6 +54,7 @@ def test_to_silver_frame_keeps_only_state_rows() -> None:
     assert silver.iloc[0]["state_abbrev"] == "AL"
     assert silver.iloc[0]["line_code"] == "1"
     assert silver.iloc[0]["bea_table_name"] == "SAPCE3"
+    assert silver.iloc[0]["series_name"] == ""
     assert silver.iloc[0]["function_name"] == "Personal consumption expenditures"
 
 
@@ -103,3 +104,28 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
 def test_to_silver_frame_allows_explicit_table_name() -> None:
     silver = to_silver_frame(_sample_payload(), bea_table_name="sapce4")
     assert set(silver["bea_table_name"].unique()) == {"SAPCE4"}
+
+
+def test_to_silver_frame_splits_series_and_function_name() -> None:
+    payload = {
+        "BEAAPI": {
+            "Results": {
+                "Data": [
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024",
+                        "Code": "SAPCE4-90",
+                        "FunctionName": "[SAPCE4] Total personal consumption expenditures: Life insurance",
+                        "DataValue": "123.4",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    }
+                ]
+            }
+        }
+    }
+    silver = to_silver_frame(payload, bea_table_name="SAPCE4")
+    assert silver.iloc[0]["series_name"] == "Total personal consumption expenditures"
+    assert silver.iloc[0]["function_name"] == "Life insurance"

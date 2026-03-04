@@ -51,6 +51,7 @@ class PostgresLoader:
             year INTEGER NOT NULL,
             line_code TEXT NOT NULL,
             series_code TEXT NOT NULL,
+            series_name TEXT NOT NULL,
             function_name TEXT NOT NULL,
             pce_value DOUBLE PRECISION NOT NULL,
             pce_value_scaled DOUBLE PRECISION NOT NULL,
@@ -83,6 +84,14 @@ class PostgresLoader:
             conn.execute(
                 text(
                     f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ADD COLUMN IF NOT EXISTS series_name TEXT;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
                     UPDATE {schema_gold}.pce_state_annual
                     SET bea_table_name = split_part(series_code, '-', 1)
                     WHERE bea_table_name IS NULL;
@@ -94,6 +103,47 @@ class PostgresLoader:
                     f"""
                     ALTER TABLE {schema_gold}.pce_state_annual
                     ALTER COLUMN bea_table_name SET NOT NULL;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    UPDATE {schema_gold}.pce_state_annual
+                    SET series_name = CASE
+                        WHEN POSITION(':' IN COALESCE(function_name, '')) > 0 THEN
+                            BTRIM(
+                                REGEXP_REPLACE(
+                                    SPLIT_PART(function_name, ':', 1),
+                                    '^\\[[^]]+\\]\\s*',
+                                    ''
+                                )
+                            )
+                        ELSE COALESCE(series_name, '')
+                    END,
+                        function_name = CASE
+                        WHEN POSITION(':' IN COALESCE(function_name, '')) > 0 THEN
+                            BTRIM(REGEXP_REPLACE(function_name, '^[^:]*:\\s*', ''))
+                        ELSE COALESCE(function_name, '')
+                    END
+                    WHERE POSITION(':' IN COALESCE(function_name, '')) > 0;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    UPDATE {schema_gold}.pce_state_annual
+                    SET series_name = ''
+                    WHERE series_name IS NULL;
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    ALTER TABLE {schema_gold}.pce_state_annual
+                    ALTER COLUMN series_name SET NOT NULL;
                     """
                 )
             )
@@ -128,6 +178,7 @@ class PostgresLoader:
             positions = {row[0]: int(row[1]) for row in column_positions}
             desired_order = (
                 positions.get("series_code", 0)
+                < positions.get("series_name", 0)
                 < positions.get("function_name", 0)
                 < positions.get("pce_value", 0)
             )
@@ -145,6 +196,7 @@ class PostgresLoader:
                             year INTEGER NOT NULL,
                             line_code TEXT NOT NULL,
                             series_code TEXT NOT NULL,
+                            series_name TEXT NOT NULL,
                             function_name TEXT NOT NULL,
                             pce_value DOUBLE PRECISION NOT NULL,
                             pce_value_scaled DOUBLE PRECISION NOT NULL,
@@ -163,6 +215,7 @@ class PostgresLoader:
                             year,
                             line_code,
                             series_code,
+                            series_name,
                             function_name,
                             pce_value,
                             pce_value_scaled,
@@ -180,6 +233,7 @@ class PostgresLoader:
                             year,
                             line_code,
                             series_code,
+                            COALESCE(series_name, ''),
                             COALESCE(function_name, ''),
                             pce_value,
                             pce_value_scaled,
