@@ -39,8 +39,8 @@ Assume the repository is dedicated to data engineering (ingest + transforms + lo
    - Reads Bronze → produces cleaned datasets in Silver (typed columns, normalized geo/time keys, stable schemas).
    - Produces analytics-ready Gold outputs (Parquet recommended).
 4. **Load to RDS (Postgres)**:
-   - Loads Gold tables into Postgres with idempotent upserts.
-   - Creates/refreshes views for common derivatives (YoY, MoM, rolling averages) where appropriate.
+   - Loads conformed `gold` dimensions/fact into Postgres with idempotent upserts.
+   - Publishes denormalized `serving` views/tables (OBT-style) for common derivatives (YoY, MoM, rolling averages) where appropriate.
 5. **Observability + Quality**:
    - Structured logging
    - Run metadata + checkpoints
@@ -212,6 +212,10 @@ Include these practices without over-engineering:
   - Geography: two-letter state abbreviation + FIPS where available
   - Time: year (and other grain if present)
   - Category: stable identifiers from BEA metadata
+- **Postgres modeling strategy**:
+  - Maintain reusable conformed dimensions and a core fact table in `gold`.
+  - Keep analyst/API-friendly denormalized contracts in `serving`.
+  - Preserve backward compatibility objects only as migration surfaces.
 - **Storage formats**:
   - Bronze: raw JSON (or gzipped JSON) + metadata
   - Silver/Gold: Parquet preferred

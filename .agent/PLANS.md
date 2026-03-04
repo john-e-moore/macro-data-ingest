@@ -388,6 +388,106 @@ Defined interfaces (stub level):
 
 ---
 
+## Conformed Gold + Serving OBT Strategy Rollout
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/conformed-gold-serving-model`; feature brief `.agent/features/2026-03-04-conformed-gold-serving-model/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/8`.
+
+## Purpose / Big Picture
+
+Move Postgres modeling to a hybrid architecture: conformed dimensions/fact in `gold` as the durable
+semantic core, and denormalized OBT/derivative views in `serving` for analyst/API workloads.
+The observable result is stable cross-source-ready schema contracts plus unchanged usability for
+existing BEA consumers.
+
+## Progress
+
+- [x] (2026-03-04 00:00Z) Initial planning completed.
+- [x] Implementation of conformed model + serving view refresh completed.
+- [x] PR created and validation evidence recorded (full lint/test blocked by missing tooling in execution environment).
+
+## Surprises & Discoveries
+
+- Observation: existing code had no tests around the load stage vintage partition extraction.
+  Evidence: no `tests/test_load_pipeline.py` existed before this feature.
+
+## Decision Log
+
+- Decision: retain `gold.pce_state_annual` and `serving.v_pce_state_yoy` as compatibility surfaces.
+  Rationale: avoid immediate downstream breakage while shifting semantic source of truth to conformed tables.
+  Date/Author: 2026-03-04, codex agent
+- Decision: derive `vintage_tag` from Silver `extract_date` partition.
+  Rationale: deterministic per extract date, easy to reason about, and compatible with idempotent reruns.
+  Date/Author: 2026-03-04, codex agent
+
+## Outcomes & Retrospective
+
+Conformed dimensions/fact and serving OBT/YoY views are implemented in loader DDL and refresh logic.
+Documentation and `.agent` guidance now encode this as the repository default modeling strategy.
+Remaining work is runtime validation in connected staging/prod environments.
+
+## Context and Orientation
+
+Key files:
+- `src/macro_data_ingest/transforms/gold.py` (wide-to-conformed projection)
+- `src/macro_data_ingest/load/pipeline.py` (vintage tag extraction + load orchestration)
+- `src/macro_data_ingest/load/postgres_loader.py` (DDL + upserts + serving views)
+- `tests/test_gold_transform.py`, `tests/test_load_pipeline.py`, `tests/test_postgres_loader.py`
+- `docs/architecture.md`, `docs/spec.md`, `docs/operability.md`, `.agent/AGENTS.md`, `.agent/SPEC.md`
+
+## Plan of Work
+
+1. Add conformed projection from Gold frame to load-ready frame.
+2. Extend Postgres loader with conformed dimension/fact DDL and upsert operations.
+3. Build serving views from conformed model (`obt_state_macro_annual_latest`, `v_macro_yoy`) and keep compatibility view.
+4. Add unit tests for projection/vintage helper and date-bound utility.
+5. Update repo/operator/agent documentation with the data modeling contract.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint
+    make test
+    git status
+
+Expected outcomes:
+- lint and tests pass,
+- branch contains only intentional feature changes,
+- PR can be opened against `main`.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- Conformed tables are created via `ensure_base_objects`.
+- `mdi load` writes both compatibility and conformed structures idempotently.
+- `serving.obt_state_macro_annual_latest` and `serving.v_macro_yoy` are available.
+- Existing BEA consumers still have `serving.v_pce_state_yoy`.
+- Unit tests pass.
+
+## Idempotence and Recovery
+
+- DDL uses `IF NOT EXISTS`.
+- Upserts use explicit conflict targets for dims/fact and compatibility table.
+- If load fails, rerun `mdi load` for the same dataset/run scope; keys prevent duplicate records.
+
+## Artifacts and Notes
+
+- `.agent/features/2026-03-04-conformed-gold-serving-model/SPEC.md`
+- `src/macro_data_ingest/transforms/gold.py`
+- `src/macro_data_ingest/load/pipeline.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `docs/architecture.md`
+- `.agent/AGENTS.md`
+
+## Interfaces and Dependencies
+
+- `to_conformed_observation_frame(gold_frame, source_name, dataset_id, vintage_tag) -> pd.DataFrame`
+- `PostgresLoader.upsert_conformed_observations(conformed_frame, run_id, source_release_tag)`
+- Postgres `ON CONFLICT` upsert semantics
+
+---
+
 ## Optional: Active ExecPlan Index
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
@@ -1197,3 +1297,4 @@ Dependencies:
 - `2026-03-04 - Function Name Propagation for Gold PCE State Annual - status: done - owner: codex agent`
 - `2026-03-04 - Standardized Backfill SOP and Function Name Metadata Repair - status: done - owner: codex agent`
 - `2026-03-04 - Remove SAPCE3 Duplicate-Risk Rows - status: done - owner: codex agent`
+- `2026-03-04 - Conformed Gold + Serving OBT Strategy Rollout - status: in progress - owner: codex agent`

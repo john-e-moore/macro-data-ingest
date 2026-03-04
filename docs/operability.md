@@ -20,6 +20,7 @@ Minimum checks by stage:
 - Expected schema column presence/type checks
 - Row count sanity checks between stages
 - Uniqueness checks for designated primary keys
+- Referential checks for conformed `gold` fact foreign keys (`source_id`, `geo_id`, `period_id`, `series_id`, `vintage_id`)
 
 Failure behavior:
 - Mark run as failed
@@ -48,6 +49,7 @@ Current policy:
 - Daily ingest requests the configured full annual range (`BEA_START_YEAR` through current year).
 - A checkpoint content hash (normalized `Results.Data` rows) gates downstream stages; transform/load run only when business rows change.
 - Checkpoints and manifests carry lightweight vintage metadata (`requested_year_range`, payload hash, prior payload hash, source release tag when available).
+- Postgres load writes to conformed `gold` dimensions/facts, then refreshes denormalized `serving` views.
 
 Recommended controls:
 - Limit batch size by date interval

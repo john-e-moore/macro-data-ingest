@@ -33,3 +33,63 @@ def to_gold_frame(silver_frame: pd.DataFrame) -> pd.DataFrame:
         drop=True
     )
     return gold
+
+
+def to_conformed_observation_frame(
+    gold_frame: pd.DataFrame,
+    *,
+    source_name: str,
+    dataset_id: str,
+    vintage_tag: str,
+) -> pd.DataFrame:
+    """Project the Gold wide frame into conformed observation keys and measures."""
+    required = [
+        "state_fips",
+        "state_abbrev",
+        "geo_name",
+        "year",
+        "bea_table_name",
+        "line_code",
+        "series_code",
+        "series_name",
+        "function_name",
+        "pce_value",
+        "pce_value_scaled",
+        "unit",
+        "unit_mult",
+        "note_ref",
+    ]
+    missing = [col for col in required if col not in gold_frame.columns]
+    if missing:
+        raise ValueError(f"Gold frame missing required columns: {missing}")
+
+    conformed = gold_frame[required].copy()
+    conformed["source_name"] = source_name.strip().upper()
+    conformed["dataset_id"] = dataset_id.strip()
+    conformed["frequency"] = "A"
+    conformed["period_code"] = conformed["year"].astype("Int64").astype(str)
+    conformed["vintage_tag"] = vintage_tag.strip()
+    conformed = conformed[
+        [
+            "source_name",
+            "dataset_id",
+            "bea_table_name",
+            "frequency",
+            "period_code",
+            "year",
+            "state_fips",
+            "state_abbrev",
+            "geo_name",
+            "line_code",
+            "series_code",
+            "series_name",
+            "function_name",
+            "unit",
+            "unit_mult",
+            "vintage_tag",
+            "pce_value",
+            "pce_value_scaled",
+            "note_ref",
+        ]
+    ]
+    return conformed

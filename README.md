@@ -16,7 +16,7 @@ Implemented and validated vertical slices:
 1. Provisioning and environment bootstrap (staging resources created)
 2. Ingestion (BEA -> Bronze + manifests + hash-based change detection)
 3. Silver transforms + baseline quality checks
-4. Gold modeling + Postgres load + YoY serving view
+4. Gold conformed model (dims/fact) + Postgres load + OBT/YoY serving views
 
 Remaining: final CI/scheduler hardening and production rollout checks.
 
@@ -81,6 +81,15 @@ or local runs.
 - Roadmap: `docs/roadmap.md`
 - Operability runbook: `docs/operability.md`
 - Backfill SOP: `docs/backfills.md`
+
+## Data Modeling Strategy
+
+Postgres uses a hybrid model:
+
+- `gold` stores conformed dimensions and `gold.fact_macro_observation` as the durable core.
+- `serving` exposes denormalized OBT-style views for common analyst/API access patterns.
+- Legacy `gold.pce_state_annual` and `serving.v_pce_state_yoy` remain for compatibility while
+  consumers migrate to generalized serving contracts.
 
 ## Security Notes
 
