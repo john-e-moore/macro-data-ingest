@@ -927,7 +927,7 @@ Dependencies:
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/pce-function-name`; feature brief `.agent/features/2026-03-04-pce-function-name/SPEC.md`; PR `TBD`.
+Links: branch `feature/pce-function-name`; feature brief `.agent/features/2026-03-04-pce-function-name/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/4`.
 
 ## Purpose / Big Picture
 
