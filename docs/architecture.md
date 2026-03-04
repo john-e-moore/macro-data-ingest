@@ -124,3 +124,5 @@ Dataset definitions are kept in `config/datasets.yaml`. Each enabled entry contr
 - Postgres target table
 
 Daily runs iterate all enabled datasets, so adding a BEA table or a new time grain is config-first.
+Current enabled annual datasets are `pce_state_sapce1` and `pce_state_sapce4`; monthly SAPCE4
+remains staged as a disabled entry.
