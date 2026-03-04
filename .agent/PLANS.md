@@ -1306,7 +1306,7 @@ Dependencies:
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/sapce4-monthly-series`; feature brief `.agent/features/2026-03-04-sapce4-monthly-series/SPEC.md`; PR `TBD`.
+Links: branch `feature/sapce4-monthly-series`; feature brief `.agent/features/2026-03-04-sapce4-monthly-series/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/9`.
 
 ## Purpose / Big Picture
 
