@@ -21,6 +21,8 @@ Orchestration is handled by GitHub Actions on a daily schedule plus manual dispa
   - Current slice keeps state + DC rows with keys: `bea_table_name`, `state_fips`, `state_abbrev`, `year`, `line_code`
 - **Gold**
   - Consumer-friendly facts/aggregates suitable for BI and SQL analysis
+  - `gold.pce_state_annual` includes both machine identifiers (`line_code`, `series_code`) and
+    human-readable BEA function labels (`function_name`)
 
 ## S3 Partitioning Conventions
 

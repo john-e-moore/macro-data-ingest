@@ -923,6 +923,130 @@ Dependencies:
 
 ---
 
+# Function Name Propagation for Gold PCE State Annual
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/pce-function-name`; feature brief `.agent/features/2026-03-04-pce-function-name/SPEC.md`; PR `TBD`.
+
+## Purpose / Big Picture
+
+Expose a human-readable BEA function label directly in `gold.pce_state_annual` so analysts can query category names without external joins. The observable result is a new non-null `function_name` column stored between `series_code` and `pce_value` and populated during ingest/transform/load.
+
+## Progress
+
+- [x] (2026-03-04 00:00Z) Initial planning completed.
+- [x] Implementation across ingest, transforms, and load completed.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: `--smoke` runs for `LineCode=ALL` can return zero rows when the prior calendar year is not published for a table.
+  Evidence: ingest error `BEA returned zero rows ... year=2025 ... line_code=ALL`.
+- Observation: full live pulls for all line codes may hit BEA API rate limits (HTTP 429) in local validation.
+  Evidence: ingest traceback with `429 Client Error: Too Many Requests` on `GetData`.
+
+## Decision Log
+
+- Decision: source `function_name` from BEA `GetParameterValuesFiltered` `ParamValue.Desc` metadata and map by `LineCode`.
+  Rationale: BEA payload rows do not consistently include a durable function label field, but metadata endpoint provides canonical line descriptions.
+  Date/Author: 2026-03-04, codex agent
+- Decision: keep migration additive (`ADD COLUMN IF NOT EXISTS`) and backfill nulls to empty string before `NOT NULL`.
+  Rationale: safe rollout for existing deployments with minimal operational risk.
+  Date/Author: 2026-03-04, codex agent
+- Decision: validate pipeline end-to-end using a minimal one-line-code dataset config for live run evidence.
+  Rationale: avoids transient BEA 429 limits while still proving ingest/transform/load and Postgres schema changes.
+  Date/Author: 2026-03-04, codex agent
+
+## Outcomes & Retrospective
+
+Implementation is complete across client, ingest, Silver, Gold, Postgres load DDL/migration, and tests. Validation succeeded with local lint/tests (`31 passed`) plus a live staging run (ingest + transform + load) using a minimal dataset config to avoid BEA 429 throttling while still exercising end-to-end behavior. Postgres verification confirms `function_name` is physically between `series_code` and `pce_value` and populated with BEA function labels.
+
+## Context and Orientation
+
+Relevant paths:
+- `src/macro_data_ingest/ingest/bea_client.py` for BEA metadata lookup.
+- `src/macro_data_ingest/ingest/pipeline.py` for row-level function-name enrichment during `LineCode=ALL` expansion.
+- `src/macro_data_ingest/transforms/silver.py` and `src/macro_data_ingest/transforms/gold.py` for contract propagation.
+- `src/macro_data_ingest/load/postgres_loader.py` for table schema and migration behavior.
+- `tests/test_bea_client.py`, `tests/test_ingest_pipeline.py`, `tests/test_silver_transform.py`, `tests/test_gold_transform.py` for behavior coverage.
+
+## Plan of Work
+
+1. Add BEA line-code description mapping method in client.
+2. Enrich ingested rows with `FunctionName` prior to Bronze write.
+3. Extend Silver and Gold contracts with `function_name`.
+4. Add Postgres schema migration + DDL ordering requirement.
+5. Add/update unit tests.
+6. Run lint/tests, execute end-to-end validation run, and verify DB column shape/data.
+7. Prepare PR using `.agent/PR_TEMPLATE.md`.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make install lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi run-all --env staging --run-id function-name-validation --dataset-id pce_state_sapce3
+
+Expected outcomes:
+- lint/tests pass locally;
+- pipeline stages complete and load applies schema migration;
+- Postgres shows `function_name` column and populated values.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- BEA client returns line-code description mapping.
+- Ingest rows contain `FunctionName` when line metadata is available.
+- Silver/Gold include `function_name` column.
+- Postgres table includes `function_name` between `series_code` and `pce_value`.
+- Idempotent upsert behavior remains unchanged.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Existing primary key and upsert logic are unchanged.
+- Additive column migration is repeatable (`IF NOT EXISTS`, deterministic null backfill).
+
+Recovery:
+- If ingest hits BEA rate limits, rerun with reduced dataset scope for validation, then rerun full scheduled pipeline.
+- If load fails mid-run, rerun load safely; migration and upsert are idempotent.
+
+## Artifacts and Notes
+
+Artifacts:
+- `.agent/features/2026-03-04-pce-function-name/SPEC.md`
+- `src/macro_data_ingest/ingest/bea_client.py`
+- `src/macro_data_ingest/ingest/pipeline.py`
+- `src/macro_data_ingest/transforms/silver.py`
+- `src/macro_data_ingest/transforms/gold.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `tests/test_bea_client.py`
+- `tests/test_ingest_pipeline.py`
+- `tests/test_silver_transform.py`
+- `tests/test_gold_transform.py`
+- `docs/architecture.md`
+
+Evidence snippets:
+- `make lint test PYTHON=.venv/bin/python` -> `All checks passed!` and `31 passed`.
+- `DATASETS_CONFIG_PATH=/tmp/datasets-function-name.yaml .venv/bin/mdi run-all --env staging --run-id function-name-validate-20260304 --dataset-id pce_state_sapce3_lc1` -> ingest/transform/load completed.
+- Postgres verification query output:
+  - `col_order [..., 'series_code', 'function_name', 'pce_value', ...]`
+  - `function_between True`
+  - `function_name_groups [('[SAPCE3] Total personal consumption expenditures: Personal consumption expenditures', 51)]`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `BeaClient.fetch_line_code_descriptions(dataset, table_name) -> dict[str, str]`
+- Gold table contract `gold.pce_state_annual(..., series_code, function_name, pce_value, ...)`
+
+Dependencies:
+- BEA API (`GetParameterValuesFiltered`, `GetData`)
+- AWS S3 for Bronze/Silver artifacts
+- Postgres for Gold table migration and upsert
+
+---
+
 ## Optional: Active ExecPlan Index
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
@@ -932,3 +1056,4 @@ Dependencies:
 - `2026-03-03 - Gold Modeling and Postgres Load Vertical Slice D - status: done - owner: codex agent`
 - `2026-03-03 - CI and Scheduler Hardening Vertical Slice E - status: done - owner: codex agent`
 - `2026-03-03 - Vintage Strategy and SAPCE3 Historical Backfill - status: done - owner: codex agent`
+- `2026-03-04 - Function Name Propagation for Gold PCE State Annual - status: done - owner: codex agent`
