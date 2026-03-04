@@ -108,6 +108,17 @@ Recommended optional secrets (override defaults when needed):
 `config/datasets.yaml` is the canonical source for multi-table daily runs. By default it includes
 `SAPCE3` and `SAPCE4` with `line_code: ALL`, so all SAPCE4 functions are ingested on each run.
 
+## Standardized Backfills
+
+Use `docs/backfills.md` for approved backfill procedures.
+
+For metadata-only repairs of `function_name` in `gold.pce_state_annual`:
+
+- Dry run:
+  - `python scripts/backfill_function_names.py --env staging --tables SAPCE3,SAPCE4 --run-id backfill-function-name-<date>-dryrun --dry-run`
+- Apply:
+  - `python scripts/backfill_function_names.py --env staging --tables SAPCE3,SAPCE4 --run-id backfill-function-name-<date>`
+
 ## Rollback / Cleanup Guidance (Manual)
 
 If provisioning created incorrect resources:

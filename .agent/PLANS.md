@@ -171,6 +171,123 @@ Name libraries/services/modules used and any required interfaces or function sig
 
 ---
 
+# Standardized Backfill SOP and Function Name Metadata Repair
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/backfill-runbook-function-name`; feature brief `.agent/features/2026-03-04-backfill-runbook-function-name/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/5`.
+
+## Purpose / Big Picture
+
+Establish a standardized, repeatable backfill process and execute a targeted metadata backfill so
+`gold.pce_state_annual.function_name` is populated for existing SAPCE3/SAPCE4 rows without
+re-ingesting historical fact values. The observable outcome is complete function labels plus an
+operator-ready runbook and utility for future backfills.
+
+## Progress
+
+- [x] (2026-03-04 00:00Z) Initial planning completed.
+- [x] Implementation completed.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: SAPCE4 line-code metadata from BEA is complete, but existing DB rows were loaded before enrichment.
+  Evidence: `mapping_size=134` for SAPCE4 with non-empty labels while DB had `non_empty_fn=0`.
+- Observation: historical SAPCE3 rows remained blank while 2024 test rows were populated.
+  Evidence: grouped table/year query showed SAPCE3 `2024` non-empty and `2000-2023` empty.
+
+## Decision Log
+
+- Decision: implement metadata-only backfill script for function labels instead of full historical re-ingest.
+  Rationale: avoids BEA `429` risk and updates only derived label fields while preserving numeric facts.
+  Date/Author: 2026-03-04, codex agent
+
+## Outcomes & Retrospective
+
+Implemented and validated in staging. The new metadata backfill utility populated all missing
+`function_name` values for both SAPCE3 and SAPCE4 without re-ingesting full historical data.
+Runbook documentation is now explicit and command-driven, with dry-run/apply/validation steps.
+
+## Context and Orientation
+
+Relevant paths:
+- `docs/operability.md` (policy-level runbook guidance),
+- `src/macro_data_ingest/ingest/bea_client.py` (line-code descriptions),
+- `src/macro_data_ingest/load/postgres_loader.py` (DB connectivity conventions),
+- `gold.pce_state_annual` in Postgres where backfill applies.
+
+## Plan of Work
+
+1. Add `docs/backfills.md` with standardized SOP.
+2. Add `scripts/backfill_function_names.py` with dry-run/apply, explicit run IDs, and audit record writes.
+3. Update docs references in `README.md`, `docs/setup.md`, and `docs/operability.md`.
+4. Run lint/tests.
+5. Execute dry-run then apply for SAPCE3/SAPCE4 in staging and validate row-level outcomes.
+6. Update plan evidence and open PR.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/python scripts/backfill_function_names.py --env staging --tables SAPCE3,SAPCE4 --run-id backfill-function-name-20260304-dryrun --dry-run
+    .venv/bin/python scripts/backfill_function_names.py --env staging --tables SAPCE3,SAPCE4 --run-id backfill-function-name-20260304
+
+Expected outcomes:
+- docs and script in place;
+- tests/lint pass;
+- SAPCE3 and SAPCE4 function labels become non-empty in `gold.pce_state_annual`.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- runbook exists and is actionable.
+- script supports `--dry-run`, `--run-id`, and `--force`.
+- `meta.ingest_runs` records backfill stage metadata.
+- grouped table/year query shows non-empty `function_name` coverage for SAPCE3/SAPCE4.
+
+## Idempotence and Recovery
+
+Idempotence:
+- default behavior updates only blank labels;
+- reruns are safe and should produce zero updates once complete.
+
+Recovery:
+- if interrupted, rerun the same command;
+- if values need correction, rerun with `--force`.
+
+## Artifacts and Notes
+
+Artifacts:
+- `.agent/features/2026-03-04-backfill-runbook-function-name/SPEC.md`
+- `docs/backfills.md`
+- `scripts/backfill_function_names.py`
+- `docs/operability.md`
+- `docs/setup.md`
+- `README.md`
+- `tests/test_backfill_function_names.py`
+
+Evidence snippets:
+- `python scripts/backfill_function_names.py --env staging --tables SAPCE3,SAPCE4 --run-id backfill-function-name-20260304-dryrun --dry-run`
+  - SAPCE3 `empty_before=1224`, SAPCE4 `empty_before=169575`
+- `python scripts/backfill_function_names.py --env staging --tables SAPCE3,SAPCE4 --run-id backfill-function-name-20260304`
+  - SAPCE3 `rows_updated=1224`, SAPCE4 `rows_updated=169575`, both `empty_after=0`
+- Validation query:
+  - SAPCE3 coverage `1275/1275` non-empty
+  - SAPCE4 coverage `169575/169575` non-empty
+  - SAPCE4 line code `37` label resolved to `Health`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `python scripts/backfill_function_names.py --env <staging|prod> --tables SAPCE3,SAPCE4 --run-id <id> [--dry-run] [--force]`
+
+Dependencies:
+- BEA API metadata endpoint (`GetParameterValuesFiltered`)
+- Postgres access to `gold.pce_state_annual` and `meta.ingest_runs`
+
+---
+
 ## Optional: Active ExecPlan Index
 
 Use this section to track in-flight plans:
@@ -1057,3 +1174,4 @@ Dependencies:
 - `2026-03-03 - CI and Scheduler Hardening Vertical Slice E - status: done - owner: codex agent`
 - `2026-03-03 - Vintage Strategy and SAPCE3 Historical Backfill - status: done - owner: codex agent`
 - `2026-03-04 - Function Name Propagation for Gold PCE State Annual - status: done - owner: codex agent`
+- `2026-03-04 - Standardized Backfill SOP and Function Name Metadata Repair - status: done - owner: codex agent`

@@ -80,6 +80,7 @@ or local runs.
 - Functional/non-functional spec: `docs/spec.md`
 - Roadmap: `docs/roadmap.md`
 - Operability runbook: `docs/operability.md`
+- Backfill SOP: `docs/backfills.md`
 
 ## Security Notes
 
