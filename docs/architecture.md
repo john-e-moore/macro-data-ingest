@@ -72,7 +72,7 @@ Dimension responsibilities:
 
 - `dim_source`: source + dataset identity (e.g., `BEA` + `pce_state_sapce4`)
 - `dim_geo`: geography keys (`state_fips`, `state_abbrev`, `geo_name`)
-- `dim_period`: period semantics (`frequency`, `period_code`, `year`, bounds)
+- `dim_period`: period semantics (`frequency`, `period_code`, `year`, optional `month`/`quarter`, bounds)
 - `dim_series`: semantic measure identity (`series_code`, `line_code`, labels, units)
 - `dim_vintage`: release/as-of tracking and `is_latest` selection flag
 
@@ -115,8 +115,8 @@ Lineage is written to both S3 manifests and Postgres metadata tables.
 
 Dataset definitions are kept in `config/datasets.yaml`. Each enabled entry controls:
 - BEA table (`bea_table_name`)
-- query shape (`line_code`, `geo_fips`, frequency, start year)
+- query shape (`line_code`, `geo_fips`, `bea_frequency`, start year)
 - storage identity (`dataset_id`)
 - Postgres target table
 
-Daily runs iterate all enabled datasets, so adding a BEA table is config-first.
+Daily runs iterate all enabled datasets, so adding a BEA table or a new time grain is config-first.

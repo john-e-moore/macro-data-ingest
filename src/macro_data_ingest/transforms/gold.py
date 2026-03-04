@@ -9,7 +9,11 @@ def to_gold_frame(silver_frame: pd.DataFrame) -> pd.DataFrame:
         "state_fips",
         "state_abbrev",
         "geo_name",
+        "frequency",
+        "period_code",
         "year",
+        "month",
+        "quarter",
         "bea_table_name",
         "line_code",
         "series_code",
@@ -26,10 +30,12 @@ def to_gold_frame(silver_frame: pd.DataFrame) -> pd.DataFrame:
 
     gold = silver_frame[required].copy()
     gold["year"] = pd.to_numeric(gold["year"], errors="coerce").astype("Int64")
+    gold["month"] = pd.to_numeric(gold["month"], errors="coerce").astype("Int64")
+    gold["quarter"] = pd.to_numeric(gold["quarter"], errors="coerce").astype("Int64")
     gold["pce_value"] = pd.to_numeric(gold["value"], errors="coerce")
     gold["pce_value_scaled"] = gold["pce_value"] * (10 ** gold["unit_mult"])
     gold = gold.drop(columns=["value"])
-    gold = gold.sort_values(["bea_table_name", "year", "state_fips", "line_code"]).reset_index(
+    gold = gold.sort_values(["bea_table_name", "period_code", "state_fips", "line_code"]).reset_index(
         drop=True
     )
     return gold
@@ -47,7 +53,11 @@ def to_conformed_observation_frame(
         "state_fips",
         "state_abbrev",
         "geo_name",
+        "frequency",
+        "period_code",
         "year",
+        "month",
+        "quarter",
         "bea_table_name",
         "line_code",
         "series_code",
@@ -66,8 +76,6 @@ def to_conformed_observation_frame(
     conformed = gold_frame[required].copy()
     conformed["source_name"] = source_name.strip().upper()
     conformed["dataset_id"] = dataset_id.strip()
-    conformed["frequency"] = "A"
-    conformed["period_code"] = conformed["year"].astype("Int64").astype(str)
     conformed["vintage_tag"] = vintage_tag.strip()
     conformed = conformed[
         [
@@ -77,6 +85,8 @@ def to_conformed_observation_frame(
             "frequency",
             "period_code",
             "year",
+            "month",
+            "quarter",
             "state_fips",
             "state_abbrev",
             "geo_name",

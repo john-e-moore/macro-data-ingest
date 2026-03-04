@@ -46,10 +46,10 @@ Guidelines:
 - Use the standardized backfill SOP in `docs/backfills.md` for execution and validation
 
 Current policy:
-- Daily ingest requests the configured full annual range (`BEA_START_YEAR` through current year).
+- Daily ingest requests the configured full year range (`BEA_START_YEAR` through current year) per dataset frequency.
 - A checkpoint content hash (normalized `Results.Data` rows) gates downstream stages; transform/load run only when business rows change.
 - Checkpoints and manifests carry lightweight vintage metadata (`requested_year_range`, payload hash, prior payload hash, source release tag when available).
-- Postgres load writes to conformed `gold` dimensions/facts, then refreshes denormalized `serving` views.
+- Postgres load writes to conformed `gold` dimensions/facts, then refreshes denormalized `serving` views (annual serving views remain annual-only).
 
 Recommended controls:
 - Limit batch size by date interval

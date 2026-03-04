@@ -100,7 +100,11 @@ def run_transform(
     )
     payload = _read_json_from_s3(s3, config.s3_data_bucket, payload_key)
 
-    silver_frame = to_silver_frame(payload, bea_table_name=dataset_spec.bea_table_name)
+    silver_frame = to_silver_frame(
+        payload,
+        bea_table_name=dataset_spec.bea_table_name,
+        bea_frequency=dataset_spec.bea_frequency,
+    )
     validate_silver_frame(silver_frame)
 
     silver_key = (

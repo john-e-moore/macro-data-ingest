@@ -34,7 +34,7 @@ Initial scope:
 - BEA PCE by State (configurable table/line categories and time ranges).
 
 Config-driven dimensions:
-- frequency (annual to start)
+- frequency (annual and monthly supported)
 - dataset/table identifiers
 - geography selection (all states by default)
 - optional category allowlist

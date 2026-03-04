@@ -110,6 +110,7 @@ def run_load(
     gold_frame = to_gold_frame(silver_frame)
     if gold_frame.empty:
         raise ValueError("Gold frame is empty; cannot load to Postgres.")
+    dataset_frequency = str(dataset_spec.bea_frequency).strip().upper()
     vintage_tag = _extract_vintage_tag_from_silver_key(silver_key)
     conformed_frame = to_conformed_observation_frame(
         gold_frame,
@@ -125,10 +126,15 @@ def run_load(
         schema_meta=config.pg_schema_meta,
     )
     loader.ensure_base_objects()
+    pk_cols = (
+        ["bea_table_name", "state_fips", "period_code", "line_code"]
+        if dataset_frequency == "M"
+        else ["bea_table_name", "state_fips", "year", "line_code"]
+    )
     loader.upsert_gold_table(
         table_name=dataset_spec.target_table,
         frame=gold_frame,
-        pk_cols=["bea_table_name", "state_fips", "year", "line_code"],
+        pk_cols=pk_cols,
     )
     loader.upsert_conformed_observations(
         conformed_frame=conformed_frame,

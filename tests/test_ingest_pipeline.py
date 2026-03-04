@@ -3,7 +3,13 @@ from datetime import datetime, timezone
 import pytest
 
 from macro_data_ingest.ingest.bea_client import BeaQuery
-from macro_data_ingest.ingest.pipeline import _fetch_payload, _is_changed, _source_release_tag, _year_range
+from macro_data_ingest.ingest.pipeline import (
+    _fetch_payload,
+    _is_changed,
+    _source_release_tag,
+    _validate_requested_frequency,
+    _year_range,
+)
 from macro_data_ingest.run_metadata import stable_rows_hash
 
 
@@ -113,3 +119,14 @@ def test_fetch_payload_populates_function_name_for_single_line_code() -> None:
     assert len(rows) == 1
     assert len(payload["BEAAPI"]["Results"]["Data"]) == 1
     assert rows[0]["FunctionName"] == "Total PCE"
+
+
+def test_validate_requested_frequency_accepts_matching_monthly_rows() -> None:
+    rows = [{"TimePeriod": "2024M01"}, {"TimePeriod": "2024M02"}]
+    _validate_requested_frequency(rows, "M")
+
+
+def test_validate_requested_frequency_rejects_mismatched_frequency() -> None:
+    rows = [{"TimePeriod": "2024"}, {"TimePeriod": "2023"}]
+    with pytest.raises(ValueError):
+        _validate_requested_frequency(rows, "M")

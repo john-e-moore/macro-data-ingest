@@ -1298,3 +1298,133 @@ Dependencies:
 - `2026-03-04 - Standardized Backfill SOP and Function Name Metadata Repair - status: done - owner: codex agent`
 - `2026-03-04 - Remove SAPCE3 Duplicate-Risk Rows - status: done - owner: codex agent`
 - `2026-03-04 - Conformed Gold + Serving OBT Strategy Rollout - status: in progress - owner: codex agent`
+- `2026-03-04 - SAPCE4 Monthly Series Enablement - status: done - owner: codex agent`
+
+---
+
+# SAPCE4 Monthly Series Enablement
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/sapce4-monthly-series`; feature brief `.agent/features/2026-03-04-sapce4-monthly-series/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/9`.
+
+## Purpose / Big Picture
+
+Enable monthly-grain ingest/load support in a way that preserves the existing annual contracts while
+supporting monthly period keys through Silver, Gold, and conformed Postgres tables. For SAPCE4
+specifically, add guardrails that fail fast when BEA does not actually return monthly rows.
+
+## Progress
+
+- [x] (2026-03-04 00:00Z) Initial planning completed.
+- [x] Core implementation for monthly period parsing and conformed load support completed.
+- [x] Validation and documentation updates completed.
+
+## Surprises & Discoveries
+
+- Observation: Silver/Gold contracts previously assumed annual rows by deriving `year` directly from `TimePeriod`.
+  Evidence: `to_silver_frame` cast `TimePeriod` directly to numeric year and deduped on `(bea_table_name, state_fips, year, line_code)`.
+- Observation: BEA `Regional/SAPCE4` returns annual `TimePeriod` values even when queried with `Frequency=M`.
+  Evidence: staging ingest probe returned `Observed frequencies=['A']` and bronze payload frequency scan showed `Counter({'A': 47886})`.
+
+## Decision Log
+
+- Decision: standardize period identity as (`frequency`, `period_code`) while retaining `year` for annual compatibility.
+  Rationale: monthly and annual data can coexist without breaking existing annual serving contracts.
+  Date/Author: 2026-03-04, codex agent
+- Decision: add a compatibility table `gold.pce_state_monthly` instead of broadening annual serving views in this PR.
+  Rationale: keep scope focused on ingestion/model correctness and avoid accidental dashboard contract shifts.
+  Date/Author: 2026-03-04, codex agent
+- Decision: keep `pce_state_sapce4_monthly` disabled in default dataset config until a BEA table that emits monthly rows is selected.
+  Rationale: prevents scheduled `run-all` failures while preserving ready-to-use monthly modeling support.
+  Date/Author: 2026-03-04, codex agent
+
+## Outcomes & Retrospective
+
+Monthly-capable period modeling is implemented end-to-end, and SAPCE4 now fails fast with an explicit
+error when BEA does not supply monthly rows. Annual serving views stay intentionally annual. The default
+config remains stable because the monthly SAPCE4 dataset entry is staged but disabled.
+
+## Context and Orientation
+
+Relevant paths:
+- `config/datasets.yaml` for active annual/monthly dataset specs.
+- `src/macro_data_ingest/transforms/silver.py` for period parsing and primary-key validation.
+- `src/macro_data_ingest/transforms/gold.py` for period propagation to Gold/conformed frames.
+- `src/macro_data_ingest/load/postgres_loader.py` for `dim_period` and compatibility table DDL/upsert.
+- `src/macro_data_ingest/load/pipeline.py` for grain-aware upsert key selection.
+- `tests/test_silver_transform.py` and `tests/test_gold_transform.py` for monthly behavior coverage.
+
+## Plan of Work
+
+1. Add monthly SAPCE4 dataset spec.
+2. Parse and persist annual/monthly period keys in Silver.
+3. Propagate period fields through Gold and conformed frames.
+4. Extend loader period handling and monthly compatibility table support.
+5. Add test coverage for monthly parsing and period propagation.
+6. Update operator-facing docs.
+7. Run lint/tests and staging ingest for the monthly dataset.
+8. Open PR with evidence.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi ingest --env staging --run-id sapce4-monthly-validate-20260304 --dataset-id pce_state_sapce4_monthly
+
+Expected outcomes:
+- lint/tests pass;
+- monthly ingest writes Bronze payload/manifests;
+- command exits successfully or yields actionable environment constraint details.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- monthly dataset appears in config as staged entry and can be enabled when source supports `M`.
+- monthly `TimePeriod` values become `frequency='M'` and `period_code=YYYYMmm` when source rows are monthly.
+- duplicate checks use period-grain keys.
+- conformed load receives non-annual period attributes.
+- docs reflect monthly dataset staging status and annual-only serving scope.
+
+## Idempotence and Recovery
+
+Idempotence:
+- checkpoint hash behavior is unchanged;
+- monthly keying uses deterministic `period_code`;
+- upserts remain conflict-based and repeatable.
+
+Recovery:
+- disable monthly dataset via config if an environment cannot absorb new dataset volume;
+- rerun failed ingest/load with same or documented rerun `run_id`.
+
+## Artifacts and Notes
+
+Artifacts:
+- `.agent/features/2026-03-04-sapce4-monthly-series/SPEC.md`
+- `config/datasets.yaml`
+- `src/macro_data_ingest/transforms/silver.py`
+- `src/macro_data_ingest/transforms/gold.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `src/macro_data_ingest/load/pipeline.py`
+- `tests/test_silver_transform.py`
+- `tests/test_gold_transform.py`
+- `README.md`
+- `docs/architecture.md`
+- `docs/spec.md`
+- `docs/operability.md`
+
+Evidence snippets:
+- `make lint test PYTHON=.venv/bin/python` -> `All checks passed!` and `45 passed`.
+- `.venv/bin/mdi ingest --env staging --run-id sapce4-annual-smokecheck-20260304 --dataset-id pce_state_sapce4` -> success, unchanged payload skipped as expected.
+- explicit SAPCE4 monthly ingest probe -> `ValueError: BEA response did not include the requested frequency M. Observed frequencies=['A']`.
+
+## Interfaces and Dependencies
+
+Interfaces:
+- Silver output contract includes `frequency`, `period_code`, `year`, `month`, `quarter`.
+- Gold/conformed contracts preserve those period attributes for loader consumption.
+- Monthly compatibility target table: `gold.pce_state_monthly`.
+
+Dependencies:
+- BEA API `GetData` with `Frequency=M` support.
+- pandas transforms and SQLAlchemy-backed Postgres loader logic.

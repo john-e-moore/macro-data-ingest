@@ -52,6 +52,8 @@ def test_to_silver_frame_keeps_only_state_rows() -> None:
     silver = to_silver_frame(_sample_payload())
     assert len(silver) == 1
     assert silver.iloc[0]["state_abbrev"] == "AL"
+    assert silver.iloc[0]["frequency"] == "A"
+    assert silver.iloc[0]["period_code"] == "2024"
     assert silver.iloc[0]["line_code"] == "1"
     assert silver.iloc[0]["bea_table_name"] == "SAPCE3"
     assert silver.iloc[0]["series_name"] == ""
@@ -69,8 +71,12 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
             {
                 "state_fips": "01",
                 "state_abbrev": "AL",
+                "frequency": "A",
+                "period_code": "2024",
                 "geo_name": "Alabama",
                 "year": 2024,
+                "month": None,
+                "quarter": None,
                 "bea_table_name": "SAPCE3",
                 "line_code": "1",
                 "series_code": "SAPCE3-1",
@@ -83,8 +89,12 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
             {
                 "state_fips": "01",
                 "state_abbrev": "AL",
+                "frequency": "A",
+                "period_code": "2024",
                 "geo_name": "Alabama",
                 "year": 2024,
+                "month": None,
+                "quarter": None,
                 "bea_table_name": "SAPCE3",
                 "line_code": "1",
                 "series_code": "SAPCE3-1",
@@ -129,3 +139,67 @@ def test_to_silver_frame_splits_series_and_function_name() -> None:
     silver = to_silver_frame(payload, bea_table_name="SAPCE4")
     assert silver.iloc[0]["series_name"] == "Total personal consumption expenditures"
     assert silver.iloc[0]["function_name"] == "Life insurance"
+
+
+def test_to_silver_frame_parses_monthly_period_code() -> None:
+    payload = {
+        "BEAAPI": {
+            "Results": {
+                "Data": [
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024M02",
+                        "Code": "SAPCE4-90",
+                        "FunctionName": "[SAPCE4] Total personal consumption expenditures: Life insurance",
+                        "DataValue": "123.4",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    }
+                ]
+            }
+        }
+    }
+    silver = to_silver_frame(payload, bea_table_name="SAPCE4")
+    assert silver.iloc[0]["frequency"] == "M"
+    assert silver.iloc[0]["period_code"] == "2024M02"
+    assert silver.iloc[0]["year"] == 2024
+    assert silver.iloc[0]["month"] == 2
+
+
+def test_to_silver_frame_filters_to_requested_frequency() -> None:
+    payload = {
+        "BEAAPI": {
+            "Results": {
+                "Data": [
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024",
+                        "Code": "SAPCE4-1",
+                        "FunctionName": "Personal consumption expenditures",
+                        "DataValue": "100",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    },
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024M02",
+                        "Code": "SAPCE4-1",
+                        "FunctionName": "Personal consumption expenditures",
+                        "DataValue": "101",
+                        "CL_UNIT": "Millions of current dollars",
+                        "UNIT_MULT": "6",
+                        "NoteRef": "",
+                    },
+                ]
+            }
+        }
+    }
+    silver = to_silver_frame(payload, bea_table_name="SAPCE4", bea_frequency="M")
+    assert len(silver) == 1
+    assert silver.iloc[0]["frequency"] == "M"
+    assert silver.iloc[0]["period_code"] == "2024M02"
