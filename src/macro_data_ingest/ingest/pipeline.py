@@ -25,6 +25,12 @@ class IngestResult:
     checkpoint_uri: str
 
 
+def _line_code_from_series_code(series_code: str) -> str:
+    if "-" in series_code:
+        return series_code.split("-", maxsplit=1)[1]
+    return series_code
+
+
 def _smoke_year() -> str:
     return str(datetime.now(timezone.utc).year - 1)
 
@@ -57,7 +63,8 @@ def _fetch_payload(
     client: BeaClient, query: BeaQuery, smoke: bool
 ) -> tuple[dict[str, Any], BeaQuery, list[dict[str, Any]]]:
     if query.line_code.upper() == "ALL":
-        line_codes = client.fetch_line_codes(query.dataset, query.table_name)
+        line_code_descriptions = client.fetch_line_code_descriptions(query.dataset, query.table_name)
+        line_codes = list(line_code_descriptions.keys())
         if smoke:
             line_codes = line_codes[:3]
         merged_rows: list[dict[str, Any]] = []
@@ -73,6 +80,11 @@ def _fetch_payload(
             )
             payload = client.fetch(candidate)
             rows = client.extract_rows(payload)
+            for row in rows:
+                row["FunctionName"] = line_code_descriptions.get(
+                    _line_code_from_series_code(str(row.get("Code", line_code))),
+                    "",
+                )
             if base_payload is None:
                 base_payload = payload
             merged_rows.extend(rows)
@@ -85,9 +97,16 @@ def _fetch_payload(
     if not smoke:
         payload = client.fetch(query)
         rows = client.extract_rows(payload)
+        line_code_descriptions = client.fetch_line_code_descriptions(query.dataset, query.table_name)
+        for row in rows:
+            row["FunctionName"] = line_code_descriptions.get(
+                _line_code_from_series_code(str(row.get("Code", query.line_code))),
+                "",
+            )
         return payload, query, rows
 
     base_year = int(_smoke_year())
+    line_code_descriptions = client.fetch_line_code_descriptions(query.dataset, query.table_name)
     for year in [str(base_year - offset) for offset in range(0, 5)]:
         candidate = BeaQuery(
             dataset=query.dataset,
@@ -99,6 +118,11 @@ def _fetch_payload(
         )
         payload = client.fetch(candidate)
         rows = client.extract_rows(payload)
+        for row in rows:
+            row["FunctionName"] = line_code_descriptions.get(
+                _line_code_from_series_code(str(row.get("Code", query.line_code))),
+                "",
+            )
         if rows:
             return payload, candidate, rows
 

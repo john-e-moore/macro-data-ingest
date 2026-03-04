@@ -14,6 +14,7 @@ def _sample_payload() -> dict:
                         "GeoName": "United States *",
                         "TimePeriod": "2024",
                         "Code": "SAPCE3-1",
+                        "FunctionName": "Personal consumption expenditures",
                         "DataValue": "1000.0",
                         "CL_UNIT": "Millions of current dollars",
                         "UNIT_MULT": "6",
@@ -24,6 +25,7 @@ def _sample_payload() -> dict:
                         "GeoName": "Alabama",
                         "TimePeriod": "2024",
                         "Code": "SAPCE3-1",
+                        "FunctionName": "Personal consumption expenditures",
                         "DataValue": "123.4",
                         "CL_UNIT": "Millions of current dollars",
                         "UNIT_MULT": "6",
@@ -34,6 +36,7 @@ def _sample_payload() -> dict:
                         "GeoName": "New England",
                         "TimePeriod": "2024",
                         "Code": "SAPCE3-1",
+                        "FunctionName": "Personal consumption expenditures",
                         "DataValue": "456.7",
                         "CL_UNIT": "Millions of current dollars",
                         "UNIT_MULT": "6",
@@ -51,6 +54,7 @@ def test_to_silver_frame_keeps_only_state_rows() -> None:
     assert silver.iloc[0]["state_abbrev"] == "AL"
     assert silver.iloc[0]["line_code"] == "1"
     assert silver.iloc[0]["bea_table_name"] == "SAPCE3"
+    assert silver.iloc[0]["function_name"] == "Personal consumption expenditures"
 
 
 def test_validate_silver_frame_happy_path() -> None:
@@ -69,6 +73,7 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
                 "bea_table_name": "SAPCE3",
                 "line_code": "1",
                 "series_code": "SAPCE3-1",
+                "function_name": "Personal consumption expenditures",
                 "value": 1.0,
                 "unit": "u",
                 "unit_mult": 6,
@@ -82,6 +87,7 @@ def test_validate_silver_frame_duplicate_pk_fails() -> None:
                 "bea_table_name": "SAPCE3",
                 "line_code": "1",
                 "series_code": "SAPCE3-1",
+                "function_name": "Personal consumption expenditures",
                 "value": 2.0,
                 "unit": "u",
                 "unit_mult": 6,

@@ -55,10 +55,10 @@ def test_stable_rows_hash_ignores_row_order() -> None:
 
 def test_fetch_payload_expands_all_line_codes() -> None:
     class DummyClient:
-        def fetch_line_codes(self, dataset: str, table_name: str) -> list[str]:
+        def fetch_line_code_descriptions(self, dataset: str, table_name: str) -> dict[str, str]:
             assert dataset == "Regional"
             assert table_name == "SAPCE4"
-            return ["1", "10"]
+            return {"1": "Total PCE", "10": "Food services"}
 
         def fetch(self, query: BeaQuery) -> dict:
             return {
@@ -80,3 +80,36 @@ def test_fetch_payload_expands_all_line_codes() -> None:
     assert used_query.line_code == "ALL"
     assert len(rows) == 2
     assert len(payload["BEAAPI"]["Results"]["Data"]) == 2
+    assert rows[0]["FunctionName"] == "Total PCE"
+    assert rows[1]["FunctionName"] == "Food services"
+
+
+def test_fetch_payload_populates_function_name_for_single_line_code() -> None:
+    class DummyClient:
+        def fetch_line_code_descriptions(self, dataset: str, table_name: str) -> dict[str, str]:
+            assert dataset == "Regional"
+            assert table_name == "SAPCE4"
+            return {"1": "Total PCE"}
+
+        def fetch(self, query: BeaQuery) -> dict:
+            assert query.line_code == "1"
+            return {
+                "BEAAPI": {
+                    "Results": {
+                        "Data": [
+                            {"Code": "SAPCE4-1", "GeoFips": "01000", "TimePeriod": "2024"}
+                        ]
+                    }
+                }
+            }
+
+        @staticmethod
+        def extract_rows(payload: dict) -> list[dict]:
+            return payload["BEAAPI"]["Results"]["Data"]
+
+    query = BeaQuery(dataset="Regional", table_name="SAPCE4", year="2024", line_code="1")
+    payload, used_query, rows = _fetch_payload(DummyClient(), query, smoke=False)
+    assert used_query.line_code == "1"
+    assert len(rows) == 1
+    assert len(payload["BEAAPI"]["Results"]["Data"]) == 1
+    assert rows[0]["FunctionName"] == "Total PCE"
