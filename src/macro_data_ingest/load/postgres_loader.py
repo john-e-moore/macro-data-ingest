@@ -148,6 +148,12 @@ class PostgresLoader:
     def _annual_period_bounds(year: int) -> tuple[str, str]:
         return f"{year:04d}-01-01", f"{year:04d}-12-31"
 
+    @staticmethod
+    def _chunked(records: list[dict[str, Any]], size: int) -> list[list[dict[str, Any]]]:
+        if size <= 0:
+            raise ValueError("Chunk size must be positive.")
+        return [records[idx : idx + size] for idx in range(0, len(records), size)]
+
     def upsert_conformed_observations(
         self,
         conformed_frame: pd.DataFrame,
@@ -249,12 +255,17 @@ class PostgresLoader:
             ).first()
             vintage_id = int(vintage_row[0])
 
-            geos = (
-                conformed_frame[["state_fips", "state_abbrev", "geo_name"]]
-                .drop_duplicates()
-                .sort_values(["state_fips"])
-            )
+            geos = conformed_frame[["state_fips", "state_abbrev", "geo_name"]].drop_duplicates()
+            geo_params: list[dict[str, Any]] = []
             for row in geos.itertuples(index=False):
+                geo_params.append(
+                    {
+                        "state_fips": str(row.state_fips),
+                        "state_abbrev": str(row.state_abbrev),
+                        "geo_name": str(row.geo_name),
+                    }
+                )
+            if geo_params:
                 conn.execute(
                     text(
                         f"""
@@ -274,16 +285,23 @@ class PostgresLoader:
                             updated_at = NOW();
                         """
                     ),
-                    {
-                        "state_fips": str(row.state_fips),
-                        "state_abbrev": str(row.state_abbrev),
-                        "geo_name": str(row.geo_name),
-                    },
+                    geo_params,
                 )
 
             periods = conformed_frame[["frequency", "period_code", "year"]].drop_duplicates()
+            period_params: list[dict[str, Any]] = []
             for row in periods.itertuples(index=False):
                 period_start, period_end = self._annual_period_bounds(int(row.year))
+                period_params.append(
+                    {
+                        "frequency": str(row.frequency),
+                        "period_code": str(row.period_code),
+                        "period_start_date": period_start,
+                        "period_end_date": period_end,
+                        "year": int(row.year),
+                    }
+                )
+            if period_params:
                 conn.execute(
                     text(
                         f"""
@@ -316,13 +334,7 @@ class PostgresLoader:
                             updated_at = NOW();
                         """
                     ),
-                    {
-                        "frequency": str(row.frequency),
-                        "period_code": str(row.period_code),
-                        "period_start_date": period_start,
-                        "period_end_date": period_end,
-                        "year": int(row.year),
-                    },
+                    period_params,
                 )
 
             series = conformed_frame[
@@ -336,7 +348,21 @@ class PostgresLoader:
                     "unit_mult",
                 ]
             ].drop_duplicates()
+            series_params: list[dict[str, Any]] = []
             for row in series.itertuples(index=False):
+                series_params.append(
+                    {
+                        "source_id": source_id,
+                        "bea_table_name": str(row.bea_table_name),
+                        "line_code": str(row.line_code),
+                        "series_code": str(row.series_code),
+                        "series_name": str(row.series_name),
+                        "function_name": str(row.function_name),
+                        "unit": str(row.unit),
+                        "unit_mult": int(row.unit_mult),
+                    }
+                )
+            if series_params:
                 conn.execute(
                     text(
                         f"""
@@ -372,16 +398,7 @@ class PostgresLoader:
                             updated_at = NOW();
                         """
                     ),
-                    {
-                        "source_id": source_id,
-                        "bea_table_name": str(row.bea_table_name),
-                        "line_code": str(row.line_code),
-                        "series_code": str(row.series_code),
-                        "series_name": str(row.series_name),
-                        "function_name": str(row.function_name),
-                        "unit": str(row.unit),
-                        "unit_mult": int(row.unit_mult),
-                    },
+                    series_params,
                 )
 
             geo_rows = conn.execute(
@@ -453,6 +470,7 @@ class PostgresLoader:
                 """
             )
 
+            fact_params: list[dict[str, Any]] = []
             for row in conformed_frame.itertuples(index=False):
                 geo_id = geo_map.get(str(row.state_fips))
                 period_id = period_map.get((str(row.frequency), str(row.period_code)))
@@ -463,8 +481,7 @@ class PostgresLoader:
                         f"state_fips={row.state_fips} period_code={row.period_code} "
                         f"series_code={row.series_code}"
                     )
-                conn.execute(
-                    fact_sql,
+                fact_params.append(
                     {
                         "source_id": source_id,
                         "series_id": series_id,
@@ -475,8 +492,10 @@ class PostgresLoader:
                         "value_scaled": float(row.pce_value_scaled),
                         "note_ref": str(row.note_ref) if row.note_ref is not None else None,
                         "run_id": run_id,
-                    },
+                    }
                 )
+            for chunk in self._chunked(fact_params, size=5000):
+                conn.execute(fact_sql, chunk)
 
     def upsert_gold_table(self, table_name: str, frame: pd.DataFrame, pk_cols: list[str]) -> None:
         if frame.empty:
