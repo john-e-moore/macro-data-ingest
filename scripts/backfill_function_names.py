@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable
@@ -17,8 +18,10 @@ from macro_data_ingest.load.postgres_loader import PostgresLoader
 class BackfillResult:
     bea_table_name: str
     mapping_size: int
-    empty_before: int
-    empty_after: int
+    empty_function_before: int
+    empty_function_after: int
+    empty_series_before: int
+    empty_series_after: int
     rows_updated: int
 
 
@@ -45,7 +48,21 @@ def _default_run_id() -> str:
     return f"backfill-function-name-{stamp}"
 
 
-def _count_empty(
+def _split_function_label(raw_label: str) -> tuple[str, str]:
+    label = str(raw_label or "").strip()
+    if not label:
+        return "", ""
+
+    if ":" not in label:
+        return "", label
+
+    left, right = label.split(":", maxsplit=1)
+    series_name = re.sub(r"^\[[^\]]+\]\s*", "", left).strip()
+    function_name = right.strip()
+    return series_name, function_name
+
+
+def _count_empty_function(
     engine, schema_gold: str, bea_table_name: str  # noqa: ANN001
 ) -> int:
     sql = text(
@@ -60,33 +77,93 @@ def _count_empty(
         return int(conn.execute(sql, {"bea_table_name": bea_table_name}).scalar_one())
 
 
+def _count_empty_series(
+    engine, schema_gold: str, bea_table_name: str  # noqa: ANN001
+) -> int:
+    sql = text(
+        f"""
+        SELECT COUNT(*)
+        FROM {schema_gold}.pce_state_annual
+        WHERE bea_table_name = :bea_table_name
+          AND COALESCE(series_name, '') = ''
+        """
+    )
+    with engine.begin() as conn:
+        return int(conn.execute(sql, {"bea_table_name": bea_table_name}).scalar_one())
+
+
 def _update_table(
     engine, schema_gold: str, bea_table_name: str, mapping: dict[str, str], force: bool  # noqa: ANN001
 ) -> int:
     update_sql = text(
         f"""
         UPDATE {schema_gold}.pce_state_annual
-        SET function_name = :function_name
+        SET series_name = :series_name,
+            function_name = :function_name
         WHERE bea_table_name = :bea_table_name
           AND line_code = :line_code
-          AND (:force OR COALESCE(function_name, '') = '')
+          AND (:force OR COALESCE(function_name, '') = '' OR COALESCE(series_name, '') = '')
         """
     )
-    params = [
-        {
-            "bea_table_name": bea_table_name,
-            "line_code": line_code,
-            "function_name": function_name,
-            "force": force,
-        }
-        for line_code, function_name in mapping.items()
-    ]
+    params = []
+    for line_code, function_name in mapping.items():
+        series_name, parsed_function_name = _split_function_label(function_name)
+        params.append(
+            {
+                "bea_table_name": bea_table_name,
+                "line_code": line_code,
+                "series_name": series_name,
+                "function_name": parsed_function_name,
+                "force": force,
+            }
+        )
     rows_updated = 0
     with engine.begin() as conn:
         for param in params:
             result = conn.execute(update_sql, param)
             rows_updated += int(result.rowcount or 0)
     return rows_updated
+
+
+def _normalize_existing_labels(
+    engine, schema_gold: str, bea_table_name: str, force: bool  # noqa: ANN001
+) -> int:
+    update_sql = text(
+        f"""
+        UPDATE {schema_gold}.pce_state_annual
+        SET
+            series_name = CASE
+                WHEN POSITION(':' IN COALESCE(function_name, '')) > 0 THEN
+                    BTRIM(
+                        REGEXP_REPLACE(
+                            SPLIT_PART(function_name, ':', 1),
+                            '^\\[[^]]+\\]\\s*',
+                            ''
+                        )
+                    )
+                ELSE COALESCE(series_name, '')
+            END,
+            function_name = CASE
+                WHEN POSITION(':' IN COALESCE(function_name, '')) > 0 THEN
+                    BTRIM(REGEXP_REPLACE(function_name, '^[^:]*:\\s*', ''))
+                ELSE COALESCE(function_name, '')
+            END
+        WHERE bea_table_name = :bea_table_name
+          AND (
+              POSITION(':' IN COALESCE(function_name, '')) > 0
+              OR (:force AND COALESCE(series_name, '') = '')
+          )
+        """
+    )
+    with engine.begin() as conn:
+        result = conn.execute(
+            update_sql,
+            {
+                "bea_table_name": bea_table_name,
+                "force": force,
+            },
+        )
+        return int(result.rowcount or 0)
 
 
 def run_backfill(
@@ -101,30 +178,38 @@ def run_backfill(
     dsn = _build_dsn(config)
     engine = create_engine(dsn, connect_args={"connect_timeout": 10})
     client = BeaClient(api_key=config.bea_api_key)
-
-    results: list[BackfillResult] = []
-    for bea_table_name in bea_table_names:
-        mapping = client.fetch_line_code_descriptions(config.bea_dataset, bea_table_name)
-        empty_before = _count_empty(engine, schema_gold, bea_table_name)
-        rows_updated = 0
-        if not dry_run:
-            rows_updated = _update_table(engine, schema_gold, bea_table_name, mapping, force=force)
-        empty_after = _count_empty(engine, schema_gold, bea_table_name)
-        results.append(
-            BackfillResult(
-                bea_table_name=bea_table_name,
-                mapping_size=len(mapping),
-                empty_before=empty_before,
-                empty_after=empty_after,
-                rows_updated=rows_updated,
-            )
-        )
-
     loader = PostgresLoader(
         dsn=dsn,
         schema_gold=schema_gold,
         schema_meta=schema_meta,
     )
+    loader.ensure_base_objects()
+
+    results: list[BackfillResult] = []
+    for bea_table_name in bea_table_names:
+        mapping = client.fetch_line_code_descriptions(config.bea_dataset, bea_table_name)
+        empty_function_before = _count_empty_function(engine, schema_gold, bea_table_name)
+        empty_series_before = _count_empty_series(engine, schema_gold, bea_table_name)
+        rows_updated = 0
+        if not dry_run:
+            rows_updated = _update_table(engine, schema_gold, bea_table_name, mapping, force=force)
+            rows_updated += _normalize_existing_labels(
+                engine, schema_gold, bea_table_name, force=force
+            )
+        empty_function_after = _count_empty_function(engine, schema_gold, bea_table_name)
+        empty_series_after = _count_empty_series(engine, schema_gold, bea_table_name)
+        results.append(
+            BackfillResult(
+                bea_table_name=bea_table_name,
+                mapping_size=len(mapping),
+                empty_function_before=empty_function_before,
+                empty_function_after=empty_function_after,
+                empty_series_before=empty_series_before,
+                empty_series_after=empty_series_after,
+                rows_updated=rows_updated,
+            )
+        )
+
     loader.record_run(
         run_id=f"{run_id}:function_name_backfill",
         stage="backfill",
@@ -173,9 +258,11 @@ def main() -> int:
             "function_name_backfill "
             f"table={result.bea_table_name} "
             f"mapping_size={result.mapping_size} "
-            f"empty_before={result.empty_before} "
+            f"empty_function_before={result.empty_function_before} "
+            f"empty_series_before={result.empty_series_before} "
             f"rows_updated={result.rows_updated} "
-            f"empty_after={result.empty_after}"
+            f"empty_function_after={result.empty_function_after} "
+            f"empty_series_after={result.empty_series_after}"
         )
     return 0
 

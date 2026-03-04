@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pandas as pd
 
 STATE_FIPS_TO_ABBR = {
@@ -69,6 +71,20 @@ def _parse_line_code(series_code: str) -> str:
     return series_code
 
 
+def _split_function_name(raw_function_name: str) -> tuple[str, str]:
+    label = str(raw_function_name or "").strip()
+    if not label:
+        return "", ""
+
+    if ":" not in label:
+        return "", label
+
+    left, right = label.split(":", maxsplit=1)
+    series_name = re.sub(r"^\[[^\]]+\]\s*", "", left).strip()
+    function_name = right.strip()
+    return series_name, function_name
+
+
 def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.DataFrame:
     """Convert raw BEA payload into typed Silver records for state-level rows."""
     rows = raw_payload.get("BEAAPI", {}).get("Results", {}).get("Data", [])
@@ -82,6 +98,7 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
                 "bea_table_name",
                 "line_code",
                 "series_code",
+                "series_name",
                 "function_name",
                 "value",
                 "unit",
@@ -108,6 +125,9 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
         frame["FunctionName"] = frame["LineDescription"]
     if "FunctionName" not in frame.columns:
         frame["FunctionName"] = ""
+    function_parts = frame["FunctionName"].fillna("").astype(str).map(_split_function_name)
+    frame["SeriesName"] = function_parts.str[0]
+    frame["FunctionName"] = function_parts.str[1]
 
     silver = frame[
         [
@@ -118,6 +138,7 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
             "bea_table_name",
             "line_code",
             "Code",
+            "SeriesName",
             "FunctionName",
             "value",
             "CL_UNIT",
@@ -128,11 +149,13 @@ def to_silver_frame(raw_payload: dict, bea_table_name: str | None = None) -> pd.
         columns={
             "GeoName": "geo_name",
             "Code": "series_code",
+            "SeriesName": "series_name",
             "FunctionName": "function_name",
             "CL_UNIT": "unit",
             "NoteRef": "note_ref",
         }
     )
+    silver["series_name"] = silver["series_name"].fillna("").astype(str)
     silver["function_name"] = silver["function_name"].fillna("").astype(str)
     silver = silver.sort_values(
         ["bea_table_name", "year", "state_fips", "line_code"]
