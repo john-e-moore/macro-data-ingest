@@ -392,7 +392,7 @@ Defined interfaces (stub level):
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/conformed-gold-serving-model`; feature brief `.agent/features/2026-03-04-conformed-gold-serving-model/SPEC.md`; PR `TBD`.
+Links: branch `feature/conformed-gold-serving-model`; feature brief `.agent/features/2026-03-04-conformed-gold-serving-model/SPEC.md`; PR `https://github.com/john-e-moore/macro-data-ingest/pull/8`.
 
 ## Purpose / Big Picture
 
@@ -405,7 +405,7 @@ existing BEA consumers.
 
 - [x] (2026-03-04 00:00Z) Initial planning completed.
 - [x] Implementation of conformed model + serving view refresh completed.
-- [ ] Validation and PR completion.
+- [x] PR created and validation evidence recorded (full lint/test blocked by missing tooling in execution environment).
 
 ## Surprises & Discoveries
 
