@@ -40,7 +40,7 @@ This is the recommended path when `gold.pce_state_annual` has missing or stale
 ```bash
 python scripts/backfill_function_names.py \
   --env staging \
-  --tables SAPCE3,SAPCE4 \
+  --tables SAPCE4 \
   --run-id backfill-function-name-<yyyymmdd>-dryrun \
   --dry-run
 ```
@@ -50,7 +50,7 @@ python scripts/backfill_function_names.py \
 ```bash
 python scripts/backfill_function_names.py \
   --env staging \
-  --tables SAPCE3,SAPCE4 \
+  --tables SAPCE4 \
   --run-id backfill-function-name-<yyyymmdd>
 ```
 

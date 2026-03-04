@@ -1164,6 +1164,27 @@ Dependencies:
 
 ---
 
+# Remove SAPCE3 Duplicate-Risk Rows
+
+## Why
+
+`SAPCE3` and `SAPCE4` overlap for the top-level PCE function in this pipeline context. Keeping
+`SAPCE3` in ingest and `gold.pce_state_annual` creates duplicate-row risk for downstream SQL.
+
+## Plan
+
+1. Remove `SAPCE3` from default dataset configs and env defaults.
+2. Update setup/runbook docs to use SAPCE4-only operating defaults.
+3. Run lint/tests to verify no regressions.
+4. Execute DB delete for `bea_table_name='SAPCE3'` and validate row count is zero.
+
+## Evidence
+
+- Feature brief: `.agent/features/2026-03-04-remove-sapce3/SPEC.md`
+- Validation commands and DB query evidence captured in PR notes.
+
+---
+
 ## Optional: Active ExecPlan Index
 
 - `2026-02-23 - Initial Documentation and Scaffolding - status: done - owner: codex agent`
@@ -1175,3 +1196,4 @@ Dependencies:
 - `2026-03-03 - Vintage Strategy and SAPCE3 Historical Backfill - status: done - owner: codex agent`
 - `2026-03-04 - Function Name Propagation for Gold PCE State Annual - status: done - owner: codex agent`
 - `2026-03-04 - Standardized Backfill SOP and Function Name Metadata Repair - status: done - owner: codex agent`
+- `2026-03-04 - Remove SAPCE3 Duplicate-Risk Rows - status: done - owner: codex agent`

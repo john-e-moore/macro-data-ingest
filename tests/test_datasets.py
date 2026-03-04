@@ -35,8 +35,8 @@ def test_load_dataset_specs_from_yaml(monkeypatch: pytest.MonkeyPatch, tmp_path:
 
 def test_load_dataset_specs_legacy_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATASETS_CONFIG_PATH", "config/not-real.yaml")
-    monkeypatch.setenv("BEA_TABLE_NAME", "SAPCE3")
+    monkeypatch.setenv("BEA_TABLE_NAME", "SAPCE4")
     cfg = load_config()
     specs = load_dataset_specs(cfg)
     assert len(specs) == 1
-    assert specs[0].dataset_id == "pce_state_sapce3"
+    assert specs[0].dataset_id == "pce_state_sapce4"

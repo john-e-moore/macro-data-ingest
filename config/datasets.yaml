@@ -1,16 +1,4 @@
 datasets:
-  - dataset_id: pce_state_sapce3
-    source: bea
-    storage_dataset: pce_state
-    bea_dataset: Regional
-    bea_table_name: SAPCE3
-    bea_frequency: A
-    bea_start_year: 2000
-    line_code: ALL
-    geo_fips: STATE
-    target_table: pce_state_annual
-    enabled: true
-
   - dataset_id: pce_state_sapce4
     source: bea
     storage_dataset: pce_state
