@@ -42,6 +42,7 @@ Guidelines:
 - Process in deterministic batches by partition
 - Preserve Bronze immutability; regenerate Silver/Gold deterministically
 - Use idempotent upserts for Postgres targets
+- Use the standardized backfill SOP in `docs/backfills.md` for execution and validation
 
 Current policy:
 - Daily ingest requests the configured full annual range (`BEA_START_YEAR` through current year).
@@ -51,6 +52,7 @@ Current policy:
 Recommended controls:
 - Limit batch size by date interval
 - Use resumable checkpoints to continue partial backfills
+- Record each backfill run with explicit `run_id`, scope, and evidence
 
 ## Cost Controls
 
