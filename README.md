@@ -57,6 +57,8 @@ The CLI exposes pipeline commands:
 - `mdi run-all --env staging --run-id <run_id>`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce1`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_regional_price_parities_sarpp`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_real_income_and_pce_sarpi`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4_monthly`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_population`
 
@@ -67,6 +69,8 @@ ingest payload hash is unchanged.
 `run-all` reads `config/datasets.yaml` and processes each enabled dataset. The default config ingests:
 - `pce_state_sapce1` (annual SAPCE1, `bea_frequency: A`)
 - `pce_state_sapce4` (annual SAPCE4, `bea_frequency: A`)
+- `state_regional_price_parities_sarpp` (annual SARPP, `bea_frequency: A`)
+- `state_real_income_and_pce_sarpi` (annual SARPI, `bea_frequency: A`, includes real PI, real PI per capita, real PCE, and real PCE per capita)
 
 The repo also includes a staged monthly config entry:
 - `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)

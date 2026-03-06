@@ -127,4 +127,6 @@ Dataset definitions are kept in `config/datasets.yaml`. Each enabled entry contr
 
 Daily runs iterate all enabled datasets, so adding a BEA table, Census series, or a new time
 grain is config-first. Current enabled annual datasets are `pce_state_sapce1`,
-`pce_state_sapce4`, and `census_state_population`; monthly SAPCE4 remains staged as a disabled entry.
+`pce_state_sapce4`, `state_regional_price_parities_sarpp`,
+`state_real_income_and_pce_sarpi`, and `census_state_population`; monthly SAPCE4 remains
+staged as a disabled entry.
