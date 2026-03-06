@@ -43,6 +43,127 @@ datasets:
     geo_fips: STATE
     target_table: pce_state_annual
     enabled: true
+  - dataset_id: state_gdp_sagdp1
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP1
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp2
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP2
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp3
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP3
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp4
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP4
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp5
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP5
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp6
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP6
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp7
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP7
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp8
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP8
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp9
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP9
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sagdp11
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAGDP11
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: state_gdp_sasummary
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SASUMMARY
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: ALL
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
   - dataset_id: pce_state_sapce4_monthly
     source: bea
     storage_dataset: pce_state

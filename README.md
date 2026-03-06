@@ -59,6 +59,17 @@ The CLI exposes pipeline commands:
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id state_regional_price_parities_sarpp`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id state_real_income_and_pce_sarpi`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp1`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp2`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp3`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp4`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp5`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp6`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp7`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp8`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp9`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp11`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sasummary`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4_monthly`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_population`
 
@@ -71,6 +82,9 @@ ingest payload hash is unchanged.
 - `pce_state_sapce4` (annual SAPCE4, `bea_frequency: A`)
 - `state_regional_price_parities_sarpp` (annual SARPP, `bea_frequency: A`)
 - `state_real_income_and_pce_sarpi` (annual SARPI, `bea_frequency: A`, includes real PI, real PI per capita, real PCE, and real PCE per capita)
+- `state_gdp_sagdp1` through `state_gdp_sagdp9` (annual SAGDP table group, `bea_frequency: A`)
+- `state_gdp_sagdp11` (annual SAGDP table group, `bea_frequency: A`)
+- `state_gdp_sasummary` (annual state GDP summary table, `bea_frequency: A`)
 
 The repo also includes a staged monthly config entry:
 - `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)

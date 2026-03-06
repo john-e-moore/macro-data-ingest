@@ -1683,6 +1683,7 @@ Dependencies:
 
 - `2026-03-06 - Census State Population Source Integration - status: done - owner: codex agent`
 - `2026-03-06 - BEA SARPP and SARPI Series Integration - status: in progress - owner: codex agent`
+- `2026-03-06 - BEA SAGDP Table Group Integration - status: in progress - owner: codex agent`
 
 ---
 
@@ -1785,3 +1786,117 @@ Interfaces:
 Dependencies:
 - BEA API `Regional` metadata and data endpoints
 - existing S3 Bronze writer/checkpoint flow
+
+---
+
+# BEA SAGDP Table Group Integration
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/bea-sagdp-series`; feature brief `.agent/features/2026-03-06-bea-sagdp-series/SPEC.md`; PR URL `(pending)`.
+
+## Purpose / Big Picture
+
+Integrate the requested BEA state annual GDP table group so default daily runs ingest all
+configured SAGDP/SASUMMARY tables from year 2000 onward, preserving all available units/measures
+returned by BEA while using existing Bronze/Silver/Gold/load contracts.
+
+## Progress
+
+- [x] (2026-03-06 00:00Z) Initial planning completed.
+- [x] Config/docs/tests implementation completed.
+- [ ] Validation, runtime evidence capture, and PR creation completed.
+
+## Surprises & Discoveries
+
+- Observation: the requested scope is table-driven (11 BEA table names) rather than a single table with 11 line codes.
+  Evidence: requested list `SAGDP1`-`SAGDP9`, `SAGDP11`, `SASUMMARY` maps directly to BEA `TableName` values.
+
+## Decision Log
+
+- Decision: register one dataset entry per table with `line_code: ALL`.
+  Rationale: captures all available line-code metrics and associated units/measures for each table with no client changes.
+  Date/Author: 2026-03-06, codex agent
+- Decision: keep `bea_start_year: 2000` across all new entries.
+  Rationale: aligns with project baseline historical coverage policy.
+  Date/Author: 2026-03-06, codex agent
+
+## Outcomes & Retrospective
+
+In progress. Config/docs/tests are updated; validation evidence and PR link will be added after
+staging runs complete.
+
+## Context and Orientation
+
+Relevant paths:
+- `config/datasets.yaml` and `config/datasets.example.yaml` for enabled/default dataset coverage.
+- `tests/test_datasets.py` for dataset parsing coverage.
+- `README.md`, `docs/setup.md`, `docs/spec.md`, and `docs/architecture.md` for operator-facing coverage.
+
+## Plan of Work
+
+1. Add 11 BEA dataset entries for SAGDP/SASUMMARY tables to default and example dataset configs.
+2. Extend dataset parsing tests for the new table group.
+3. Update docs with expanded BEA table scope and runnable dataset IDs.
+4. Run lint/tests and staging pipeline runs for all new dataset IDs.
+5. Verify data quality including available unit coverage, then open PR.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp1
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp2
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp3
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp4
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp5
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp6
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp7
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp8
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp9
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sagdp11
+    .venv/bin/mdi run-all --env staging --run-id bea-sagdp-20260306 --dataset-id state_gdp_sasummary
+
+Expected outcomes:
+- tests pass;
+- each dataset run succeeds with non-zero rows;
+- Gold/serving rows preserve BEA unit fields for available measures.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- all 11 requested table names exist as enabled dataset entries.
+- parser tests pass and assert expected table list/start-year defaults.
+- staging `run-all` succeeds for each new dataset ID.
+- sampled loaded rows show unit diversity where source provides it (e.g., levels, index, percent-of-US).
+
+## Idempotence and Recovery
+
+Idempotence:
+- existing payload-hash checkpoint behavior remains unchanged per dataset ID.
+- load remains conflict-key upsert for deterministic reruns.
+
+Recovery:
+- on transient BEA/API failures, rerun affected dataset IDs with new run IDs.
+- rollback by disabling/removing SAGDP/SASUMMARY entries in config.
+
+## Artifacts and Notes
+
+- `.agent/features/2026-03-06-bea-sagdp-series/SPEC.md`
+- `config/datasets.yaml`
+- `config/datasets.example.yaml`
+- `tests/test_datasets.py`
+- `README.md`
+- `docs/setup.md`
+- `docs/spec.md`
+- `docs/architecture.md`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- dataset IDs `state_gdp_sagdp1..9`, `state_gdp_sagdp11`, `state_gdp_sasummary`.
+- CLI `mdi run-all --dataset-id <id>`.
+
+Dependencies:
+- BEA API `Regional` `GetData` + line-code metadata endpoint behavior.
+- existing S3/Postgres credentials and staging environment access.
