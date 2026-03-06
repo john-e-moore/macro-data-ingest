@@ -2,7 +2,7 @@
 
 This repository contains a lightweight data engineering pipeline for **state-level macro data** with current sources:
 - **BEA Personal Consumption Expenditures (PCE) by State**
-- **US Census annual state population (ACS 1-year)**
+- **US Census annual state population (ACS 1-year with pre-2005 intercensal backfill)**
 
 The target architecture is:
 - **S3 Bronze** for immutable raw API payloads
@@ -70,7 +70,7 @@ ingest payload hash is unchanged.
 
 The repo also includes a staged monthly config entry:
 - `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)
-- `census_state_population` (annual Census PEP population, `census_frequency: A`)
+- `census_state_population` (annual Census population, `census_frequency: A`, `census_start_year: 2000`)
 
 Both annual datasets use `line_code: ALL`, so all function categories for each configured BEA table
 are ingested for the enabled grain.

@@ -87,7 +87,7 @@ def _build_census_spec(entry: dict[str, Any]) -> CensusDatasetSpec:
             "census_variable",
         ).upper(),
         census_geography=_require_text(entry.get("census_geography", "state"), "census_geography"),
-        census_start_year=int(entry.get("census_start_year", 2005)),
+        census_start_year=int(entry.get("census_start_year", 2000)),
         census_frequency=_require_text(entry.get("census_frequency", "A"), "census_frequency"),
     )
 

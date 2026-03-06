@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from typing import Any
 
@@ -111,4 +112,57 @@ class CensusClient:
                         "YEAR": str(year),
                     }
                 )
+        return rows
+
+    @staticmethod
+    def _year_from_intercensal_date_desc(date_desc: str) -> int | None:
+        match = re.search(r"(\d{4})\s+population", date_desc.lower())
+        if match is None:
+            return None
+        return int(match.group(1))
+
+    def fetch_state_population_intercensal(
+        self,
+        *,
+        years: list[int],
+        variable_alias: str,
+    ) -> list[dict[str, Any]]:
+        if not years:
+            return []
+        requested_years = {int(year) for year in years}
+        payload = self._request(
+            year=2000,
+            dataset_path="pep/int_population",
+            params={
+                "get": "GEONAME,POP,DATE_DESC",
+                "for": "state:*",
+                "key": self.api_key,
+            },
+        )
+        if len(payload) < 2:
+            return []
+        header = payload[0]
+        header_index = {name: idx for idx, name in enumerate(header)}
+        required = ["GEONAME", "POP", "DATE_DESC", "state"]
+        missing = [name for name in required if name not in header_index]
+        if missing:
+            raise ValueError(f"Census intercensal response missing required columns: {missing}")
+
+        rows: list[dict[str, Any]] = []
+        for record in payload[1:]:
+            date_desc = str(record[header_index["DATE_DESC"]]).strip()
+            # Keep only July 1 annual estimates and drop April 1 base/census rows.
+            if not date_desc.lower().startswith("7/1/"):
+                continue
+            year_value = self._year_from_intercensal_date_desc(date_desc)
+            if year_value is None or year_value not in requested_years:
+                continue
+            rows.append(
+                {
+                    "NAME": record[header_index["GEONAME"]],
+                    variable_alias: record[header_index["POP"]],
+                    "state": record[header_index["state"]],
+                    "YEAR": str(year_value),
+                }
+            )
         return rows
