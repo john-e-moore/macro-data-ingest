@@ -1554,7 +1554,7 @@ Dependencies:
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/census-state-population-source`; feature brief `.agent/features/2026-03-06-census-state-population/SPEC.md`; PR URL `(pending)`.
+Links: branch `feature/census-state-population-source`; feature brief `.agent/features/2026-03-06-census-state-population/SPEC.md`; PR URL `https://github.com/john-e-moore/macro-data-ingest/pull/12`.
 
 ## Purpose / Big Picture
 
@@ -1568,7 +1568,7 @@ configured Census dataset that runs in the same ingest/transform/load pipeline, 
 - [x] (2026-03-06 00:00Z) Initial planning completed.
 - [x] Source routing + Census ingest/transform/load implementation completed.
 - [x] Validation and documentation updates completed.
-- [ ] PR opened and linked.
+- [x] PR opened and linked.
 
 ## Surprises & Discoveries
 
@@ -1681,4 +1681,4 @@ Dependencies:
 
 ## Optional: Active ExecPlan Index
 
-- `2026-03-06 - Census State Population Source Integration - status: in progress - owner: codex agent`
+- `2026-03-06 - Census State Population Source Integration - status: done - owner: codex agent`
