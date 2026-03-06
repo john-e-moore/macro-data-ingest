@@ -18,7 +18,7 @@ def _spec() -> CensusDatasetSpec:
         census_dataset_path="acs/acs1",
         census_variable="B01003_001E",
         census_geography="state",
-        census_start_year=2005,
+        census_start_year=2000,
         census_frequency="A",
     )
 

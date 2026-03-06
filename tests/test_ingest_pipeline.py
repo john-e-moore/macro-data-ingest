@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 
 import pytest
 
+from macro_data_ingest.datasets import CensusDatasetSpec
 from macro_data_ingest.ingest.bea_client import BeaQuery
 from macro_data_ingest.ingest.pipeline import (
+    _build_census_ingest_payload,
     _fetch_payload,
     _is_changed,
     _source_release_tag,
@@ -130,3 +132,52 @@ def test_validate_requested_frequency_rejects_mismatched_frequency() -> None:
     rows = [{"TimePeriod": "2024"}, {"TimePeriod": "2023"}]
     with pytest.raises(ValueError):
         _validate_requested_frequency(rows, "M")
+
+
+def test_build_census_ingest_payload_backfills_pre_2005_for_acs(monkeypatch: pytest.MonkeyPatch) -> None:
+    class DummyConfig:
+        census_api_key = "x"
+
+    spec = CensusDatasetSpec(
+        dataset_id="census_state_population",
+        source="census",
+        storage_dataset="population_state",
+        target_table="population_state_annual",
+        enabled=True,
+        census_dataset_path="acs/acs1",
+        census_variable="B01003_001E",
+        census_geography="state",
+        census_start_year=2000,
+        census_frequency="A",
+    )
+
+    class DummyCensusClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "x"
+
+        @staticmethod
+        def fetch_state_population(*, years: list[int], dataset_path: str, variable: str) -> list[dict]:
+            assert dataset_path == "acs/acs1"
+            assert variable == "B01003_001E"
+            assert 2005 in years
+            assert 2000 not in years
+            return [{"NAME": "Alabama", "B01003_001E": "4569805", "state": "01", "YEAR": "2005"}]
+
+        @staticmethod
+        def fetch_state_population_intercensal(
+            *, years: list[int], variable_alias: str
+        ) -> list[dict]:
+            assert variable_alias == "B01003_001E"
+            assert years == [2000, 2001, 2002, 2003, 2004]
+            return [{"NAME": "Alabama", "B01003_001E": "4452173", "state": "01", "YEAR": "2000"}]
+
+    monkeypatch.setattr("macro_data_ingest.ingest.pipeline.CensusClient", DummyCensusClient)
+    _, rows, _, request_params, _ = _build_census_ingest_payload(
+        config=DummyConfig(),
+        dataset_spec=spec,
+        smoke=False,
+    )
+    assert len(rows) == 2
+    assert rows[0]["YEAR"] == "2000"
+    assert rows[1]["YEAR"] == "2005"
+    assert request_params["dataset_path"] == "acs/acs1"

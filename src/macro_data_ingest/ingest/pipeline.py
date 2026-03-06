@@ -227,17 +227,43 @@ def _build_census_ingest_payload(
         current_year = datetime.now(timezone.utc).year
         floor_year = max(dataset_spec.census_start_year, current_year - 5)
         years = list(range(current_year, floor_year - 1, -1))
-    rows = client.fetch_state_population(
-        years=years,
-        dataset_path=dataset_spec.census_dataset_path,
-        variable=dataset_spec.census_variable,
-    )
+    rows: list[dict[str, Any]] = []
+    dataset_path = dataset_spec.census_dataset_path.strip().lower()
+    variable = dataset_spec.census_variable.strip().upper()
+    acs_supported_years = [year for year in years if year >= 2005]
+    pre_acs_years = [year for year in years if year < 2005]
+
+    if dataset_path == "acs/acs1":
+        if acs_supported_years:
+            rows.extend(
+                client.fetch_state_population(
+                    years=acs_supported_years,
+                    dataset_path=dataset_path,
+                    variable=variable,
+                )
+            )
+        if pre_acs_years:
+            rows.extend(
+                client.fetch_state_population_intercensal(
+                    years=pre_acs_years,
+                    variable_alias=variable,
+                )
+            )
+    else:
+        rows.extend(
+            client.fetch_state_population(
+                years=years,
+                dataset_path=dataset_path,
+                variable=variable,
+            )
+        )
     if not rows:
         raise ValueError(
             "Census returned zero rows for ingest query "
             f"dataset_path={dataset_spec.census_dataset_path} years={years} "
             f"geography={dataset_spec.census_geography} variable={dataset_spec.census_variable}."
         )
+    rows.sort(key=lambda row: (str(row.get("YEAR", "")), str(row.get("state", ""))))
     payload = {
         "CENSUSAPI": {
             "Results": {

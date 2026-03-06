@@ -114,7 +114,8 @@ Recommended optional secrets (override defaults when needed):
 
 `config/datasets.yaml` is the canonical source for daily runs. By default it includes
 annual `SAPCE1`/`SAPCE4` with `line_code: ALL` and Census annual state population
-(`dataset_path: acs/acs1`, `variable: B01003_001E`). It also includes a disabled monthly
+(`dataset_path: acs/acs1`, `variable: B01003_001E`, `start_year: 2000`; pre-2005 rows
+are backfilled from Census intercensal estimates). It also includes a disabled monthly
 SAPCE4 entry staged for future enablement once BEA returns monthly `TimePeriod` rows
 for the selected table.
 
