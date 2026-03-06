@@ -14,7 +14,6 @@ class BaseDatasetSpec:
     dataset_id: str
     source: str
     storage_dataset: str
-    target_table: str
     enabled: bool
 
 
@@ -58,7 +57,6 @@ def _build_bea_spec(entry: dict[str, Any]) -> BeaDatasetSpec:
         dataset_id=_require_text(entry.get("dataset_id"), "dataset_id"),
         source=_require_text(entry.get("source", "bea"), "source"),
         storage_dataset=_require_text(entry.get("storage_dataset", "pce_state"), "storage_dataset"),
-        target_table=_require_text(entry.get("target_table", "pce_state_annual"), "target_table"),
         enabled=bool(entry.get("enabled", True)),
         bea_dataset=_require_text(entry.get("bea_dataset", "Regional"), "bea_dataset"),
         bea_table_name=_require_text(entry.get("bea_table_name"), "bea_table_name"),
@@ -85,10 +83,6 @@ def _build_census_spec(entry: dict[str, Any]) -> CensusDatasetSpec:
         storage_dataset=_require_text(
             entry.get("storage_dataset", "population_state"),
             "storage_dataset",
-        ),
-        target_table=_require_text(
-            entry.get("target_table", "population_state_annual"),
-            "target_table",
         ),
         enabled=bool(entry.get("enabled", True)),
         census_dataset_path=_require_text(
@@ -128,7 +122,6 @@ def _legacy_default_spec(config: AppConfig) -> list[DatasetSpec]:
             dataset_id=dataset_id,
             source="bea",
             storage_dataset="pce_state",
-            target_table="pce_state_annual",
             enabled=True,
             bea_dataset=config.bea_dataset,
             bea_table_name=table_name,

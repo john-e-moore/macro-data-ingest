@@ -31,7 +31,7 @@ class LoadResult:
     run_id: str
     row_count: int
     source_silver_uri: str
-    gold_table: str
+    conformed_table: str
     manifest_uri: str
 
 
@@ -118,17 +118,11 @@ def run_load(
         gold_frame = to_gold_frame(silver_frame)
         if gold_frame.empty:
             raise ValueError("Gold frame is empty; cannot load to Postgres.")
-        dataset_frequency = str(dataset_spec.bea_frequency).strip().upper()
         conformed_frame = to_conformed_observation_frame(
             gold_frame,
             source_name=dataset_spec.source,
             dataset_id=dataset_spec.dataset_id,
             vintage_tag=vintage_tag,
-        )
-        pk_cols = (
-            ["bea_table_name", "state_fips", "period_code", "line_code"]
-            if dataset_frequency == "M"
-            else ["bea_table_name", "state_fips", "year", "line_code"]
         )
     elif isinstance(dataset_spec, CensusDatasetSpec):
         series_kind = dataset_spec.census_series_kind.strip().lower()
@@ -142,7 +136,6 @@ def run_load(
                 dataset_id=dataset_spec.dataset_id,
                 vintage_tag=vintage_tag,
             )
-            pk_cols = ["state_fips", "year", "census_variable", "census_agg_desc"]
         else:
             gold_frame = to_census_gold_frame(silver_frame)
             if gold_frame.empty:
@@ -153,7 +146,6 @@ def run_load(
                 dataset_id=dataset_spec.dataset_id,
                 vintage_tag=vintage_tag,
             )
-            pk_cols = ["state_fips", "year", "census_variable"]
     else:
         raise ValueError(f"Unsupported dataset source for load: {dataset_spec.source}")
     gold_frame["run_id"] = run_id
@@ -164,11 +156,6 @@ def run_load(
         schema_meta=config.pg_schema_meta,
     )
     loader.ensure_base_objects()
-    loader.upsert_gold_table(
-        table_name=dataset_spec.target_table,
-        frame=gold_frame,
-        pk_cols=pk_cols,
-    )
     loader.upsert_conformed_observations(
         conformed_frame=conformed_frame,
         run_id=run_id,
@@ -185,7 +172,7 @@ def run_load(
             "storage_dataset": dataset_spec.storage_dataset,
             "source_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
             "row_count": int(len(gold_frame)),
-            "gold_table": f"{config.pg_schema_gold}.{dataset_spec.target_table}",
+            "conformed_table": f"{config.pg_schema_gold}.fact_macro_observation",
             "loaded_at_utc": utc_now_iso(),
             "source": dataset_spec.source,
         },
@@ -202,11 +189,10 @@ def run_load(
         "extracted_at_utc": utc_now_iso(),
         "input_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
         "row_count": int(len(gold_frame)),
-        "target_table": f"{config.pg_schema_gold}.{dataset_spec.target_table}",
+        "conformed_table": f"{config.pg_schema_gold}.fact_macro_observation",
         "target_views": [
             "serving.obt_state_macro_annual_latest",
             "serving.v_macro_yoy",
-            "serving.v_pce_state_yoy",
             "serving.v_pce_state_per_capita_annual",
             "serving.v_state_federal_to_stategov_gdp_annual",
             "serving.v_state_federal_to_persons_gdp_annual",
@@ -228,6 +214,6 @@ def run_load(
         run_id=run_id,
         row_count=int(len(gold_frame)),
         source_silver_uri=f"s3://{config.s3_data_bucket}/{silver_key}",
-        gold_table=f"{config.pg_schema_gold}.{dataset_spec.target_table}",
+        conformed_table=f"{config.pg_schema_gold}.fact_macro_observation",
         manifest_uri=manifest_uri,
     )

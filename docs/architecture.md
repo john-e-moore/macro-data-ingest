@@ -21,7 +21,6 @@ Orchestration is handled by GitHub Actions on a daily schedule plus manual dispa
   - Current slice keeps state + DC rows with keys: `bea_table_name`, `state_fips`, `state_abbrev`, `year`, `line_code`
 - **Gold**
   - Conformed dimensions + fact table as the durable semantic core
-  - Legacy wide table (`gold.pce_state_annual`) retained for compatibility
   - Serving-facing denormalized OBT views in `serving`
 
 ## S3 Partitioning Conventions
@@ -57,12 +56,8 @@ Typical objects:
 - `gold.bridge_series_node`
 - `gold.dim_vintage`
 - `gold.fact_macro_observation`
-- `gold.pce_state_annual` (compatibility table during migration)
-- `gold.population_state_annual` (Census population compatibility table)
-- `gold.state_gov_finance_annual` (Census state government finance compatibility table)
 - `serving.obt_state_macro_annual_latest`
 - `serving.v_macro_yoy`
-- `serving.v_pce_state_yoy` (compatibility projection)
 - `serving.v_pce_state_per_capita_annual`
 - `serving.v_state_federal_to_stategov_gdp_annual`
 - `serving.v_state_federal_to_persons_gdp_annual`
@@ -80,7 +75,7 @@ Dimension responsibilities:
 - `dim_source`: source + dataset identity (e.g., `BEA` + `pce_state_sapce4`)
 - `dim_geo`: geography keys (`state_fips`, `state_abbrev`, `geo_name`)
 - `dim_period`: period semantics (`frequency`, `period_code`, `year`, optional `month`/`quarter`, bounds)
-- `dim_series`: semantic measure identity (`series_code`, `line_code`, compatibility labels, units, raw label)
+- `dim_series`: semantic measure identity (`series_code`, `line_code`, labels, units, raw label)
 - `dim_series_node`: canonical hierarchical taxonomy nodes per BEA table
 - `bridge_series_node`: bridge linking each series to its full hierarchy path
 - `dim_vintage`: release/as-of tracking and `is_latest` selection flag
@@ -91,7 +86,6 @@ Use denormalized views for consumer ergonomics and performance:
 
 - `serving.obt_state_macro_annual_latest`: one wide annual row at latest vintage
 - `serving.v_macro_yoy`: generalized YoY derivation from OBT
-- `serving.v_pce_state_yoy`: BEA-compatible projection for existing consumers
 - `serving.v_pce_state_per_capita_annual`: BEA annual values joined to Census population denominator
 - `serving.v_state_federal_to_stategov_gdp_annual`: Census state-government federal receipts intensity versus nominal GDP
 - `serving.v_state_federal_to_persons_gdp_annual`: BEA transfer-receipts-to-persons intensity versus nominal GDP
@@ -128,7 +122,7 @@ Lineage is written to both S3 manifests and Postgres metadata tables.
 Dataset definitions are kept in `config/datasets.yaml`. Each enabled entry controls:
 - source-specific request shape (`bea_*` or `census_*`)
 - storage identity (`dataset_id`)
-- Postgres target table
+- source-specific semantic identifiers used by conformed load
 
 Daily runs iterate all enabled datasets, so adding a BEA table, Census series, or a new time
 grain is config-first. Current enabled annual datasets are `pce_state_sapce1`,
