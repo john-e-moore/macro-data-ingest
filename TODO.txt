@@ -1,17 +1,19 @@
 x. Need function name for SAPCE4 tables
 x. Remove SAPCE3; SAPCE4 includes the overall series
 x. Ask GPT how we should handle datetimes; time dimension? Or is One Big Table an easier approach and just be sure to include all possible datetime stuff in each?
-3. Add monthly SAPCE4 series
-3. Make sure we are optimizing 
-2. Add Census data
-3. Create serving view w/ population-weighted pce by function
-4. New repo - create simple Next.js frontend for querying and displaying the serving layer
+x. Add monthly SAPCE4 series
+x. Add Census data
+x. Create serving view w/ population-weighted pce by function
+x. Look into how to get federal money received per program per state
+x. Ask AI if data model is coherent; could it be tighter? Do we only need fact_macro_observation at the gold layer?
+4. Ask AI how to simplify code base
+5. Stand up prod database and add staging / prod to CI
+6. Frontend (New repo) - create simple Next.js frontend for querying and displaying the serving layer
  - Country-level view with states
  - State-level view with counties
  - Color scale
  - Display summary stats as well as map
-4. Look into how to get federal money received per program per state
-5. Serving optimization
+7. Serving optimization
  - Add targeted indexes at common filters (source, period, vintage, geo paths)
  - Consider materializing hottest serving objects
  - Consider partitioning fact table by period or source if row count grows a lot
