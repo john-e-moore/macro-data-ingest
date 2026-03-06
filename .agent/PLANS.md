@@ -2027,7 +2027,7 @@ Dependencies:
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/simplify-postgres-serving-model`; feature brief `.agent/features/2026-03-06-remove-compatibility-surfaces/SPEC.md`; PR URL `(pending)`.
+Links: branch `feature/simplify-postgres-serving-model`; feature brief `.agent/features/2026-03-06-remove-compatibility-surfaces/SPEC.md`; PR URL `https://github.com/john-e-moore/macro-data-ingest/pull/17`.
 
 ## Purpose / Big Picture
 
@@ -2041,7 +2041,7 @@ path.
 - [x] (2026-03-06 00:00Z) Initial planning completed.
 - [x] Loader/config/tests/docs simplification implementation completed.
 - [x] Validation and staging idempotency check completed.
-- [ ] PR creation completed.
+- [x] PR creation completed.
 
 ## Surprises & Discoveries
 
