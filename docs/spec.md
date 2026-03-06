@@ -35,6 +35,7 @@ Initial scope:
   - PCE by state (`SAPCE1`, `SAPCE4`)
   - Regional price parities by state (`SARPP`)
   - Real personal income and real PCE by state (`SARPI`)
+  - State annual GDP table group (`SAGDP1`-`SAGDP9`, `SAGDP11`, `SASUMMARY`)
 
 Config-driven dimensions:
 - frequency (annual and monthly supported)
