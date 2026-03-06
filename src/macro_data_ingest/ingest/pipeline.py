@@ -362,7 +362,6 @@ def run_ingest(
     previous_payload_hash = None
     if previous_checkpoint is not None:
         previous_payload_hash = previous_checkpoint.get("payload_hash")
-    source_release_tag = _source_release_tag(payload)
     checkpoint_uri = writer.write_checkpoint(
         source=source,
         dataset=dataset,

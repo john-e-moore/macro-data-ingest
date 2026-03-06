@@ -30,6 +30,8 @@ def test_build_params_omits_line_code_for_all() -> None:
 
 def test_fetch_raises_when_bea_error() -> None:
     class DummyResponse:
+        text = "{}"
+
         def raise_for_status(self) -> None:
             return None
 
@@ -48,7 +50,7 @@ def test_fetch_raises_when_bea_error() -> None:
             return DummyResponse()
 
     client = BeaClient(api_key="abc-123")
-    client._session = DummySession()
+    client._http._session = DummySession()
 
     try:
         client.fetch(BeaQuery(dataset="Regional", table_name="BAD"))
@@ -59,6 +61,8 @@ def test_fetch_raises_when_bea_error() -> None:
 
 def test_fetch_line_codes_reads_parameter_values() -> None:
     class DummyResponse:
+        text = "{}"
+
         def raise_for_status(self) -> None:
             return None
 
@@ -79,12 +83,14 @@ def test_fetch_line_codes_reads_parameter_values() -> None:
             return DummyResponse()
 
     client = BeaClient(api_key="abc-123")
-    client._session = DummySession()
+    client._http._session = DummySession()
     assert client.fetch_line_codes("Regional", "SAPCE4") == ["1", "10"]
 
 
 def test_fetch_line_code_descriptions_reads_desc_values() -> None:
     class DummyResponse:
+        text = "{}"
+
         def raise_for_status(self) -> None:
             return None
 
@@ -105,7 +111,7 @@ def test_fetch_line_code_descriptions_reads_desc_values() -> None:
             return DummyResponse()
 
     client = BeaClient(api_key="abc-123")
-    client._session = DummySession()
+    client._http._session = DummySession()
     assert client.fetch_line_code_descriptions("Regional", "SAPCE4") == {
         "1": "Personal consumption expenditures",
         "10": "Food services and accommodations",
@@ -116,6 +122,7 @@ def test_fetch_retries_transient_429() -> None:
     class DummyResponse429:
         status_code = 429
         headers = {"Retry-After": "0"}
+        text = "{}"
 
         def raise_for_status(self) -> None:
             raise requests.HTTPError(response=self)
@@ -124,6 +131,8 @@ def test_fetch_retries_transient_429() -> None:
             return {}
 
     class DummyResponseOK:
+        text = "{}"
+
         def raise_for_status(self) -> None:
             return None
 
@@ -141,6 +150,6 @@ def test_fetch_retries_transient_429() -> None:
             return DummyResponseOK()
 
     client = BeaClient(api_key="abc-123", max_retries=2, retry_backoff_seconds=0, min_request_interval_seconds=0)
-    client._session = DummySession()
+    client._http._session = DummySession()
     payload = client.fetch(BeaQuery(dataset="Regional", table_name="SAPCE4", line_code="1"))
     assert payload["BEAAPI"]["Results"]["Data"][0]["x"] == 1

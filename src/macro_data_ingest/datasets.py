@@ -114,29 +114,10 @@ def _build_spec(entry: dict[str, Any]) -> DatasetSpec:
     raise ValueError(f"Unsupported dataset source: {source}")
 
 
-def _legacy_default_spec(config: AppConfig) -> list[DatasetSpec]:
-    table_name = config.bea_table_name.strip()
-    dataset_id = f"pce_state_{table_name.lower()}"
-    return [
-        BeaDatasetSpec(
-            dataset_id=dataset_id,
-            source="bea",
-            storage_dataset="pce_state",
-            enabled=True,
-            bea_dataset=config.bea_dataset,
-            bea_table_name=table_name,
-            bea_frequency=config.bea_frequency,
-            bea_start_year=config.bea_start_year,
-            line_code="ALL",
-            geo_fips="STATE",
-        )
-    ]
-
-
 def load_dataset_specs(config: AppConfig) -> list[DatasetSpec]:
     config_path = Path(config.datasets_config_path)
     if not config_path.exists():
-        return _legacy_default_spec(config)
+        raise ValueError(f"Datasets config not found: {config.datasets_config_path}")
 
     raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):

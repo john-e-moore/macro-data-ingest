@@ -19,7 +19,6 @@ class ProvisionPlan:
     aws_region: str
     data_bucket: str
     log_bucket: str
-    bronze_retention_days: int
     logs_retention_days: int
     rds_identifier: str
     rds_subnet_group: str
@@ -58,7 +57,6 @@ def build_plan(env: str) -> ProvisionPlan:
         aws_region=cfg.aws_region,
         data_bucket=data_bucket,
         log_bucket=log_bucket,
-        bronze_retention_days=3650,
         logs_retention_days=90,
         rds_identifier=f"{base_name}-pg",
         rds_subnet_group=f"{base_name}-db-subnets",
