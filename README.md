@@ -127,8 +127,6 @@ Postgres uses a hybrid model:
 
 - `gold` stores conformed dimensions and `gold.fact_macro_observation` as the durable core.
 - `serving` exposes denormalized OBT-style views for common analyst/API access patterns.
-- Legacy `gold.pce_state_annual` and `serving.v_pce_state_yoy` remain for compatibility while
-  consumers migrate to generalized serving contracts.
 - Fiscal-intensity views are available in:
   - `serving.v_state_federal_to_stategov_gdp_annual`
   - `serving.v_state_federal_to_persons_gdp_annual`

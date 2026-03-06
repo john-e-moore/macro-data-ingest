@@ -2020,3 +2020,130 @@ Interfaces:
 Dependencies:
 - BEA API `Regional` `GetData` + line-code metadata endpoint behavior.
 - existing S3/Postgres credentials and staging environment access.
+
+---
+
+# Postgres Serving Simplification (Conformed-Only)
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/simplify-postgres-serving-model`; feature brief `.agent/features/2026-03-06-remove-compatibility-surfaces/SPEC.md`; PR URL `https://github.com/john-e-moore/macro-data-ingest/pull/17`.
+
+## Purpose / Big Picture
+
+Remove pre-conformed compatibility surfaces before frontend and AI query integration so the database
+has one clear semantic source of truth (`gold.fact_macro_observation` + `serving` views). The
+observable outcome is a simpler schema with no duplicate legacy tables/views and no dual-write load
+path.
+
+## Progress
+
+- [x] (2026-03-06 00:00Z) Initial planning completed.
+- [x] Loader/config/tests/docs simplification implementation completed.
+- [x] Validation and staging idempotency check completed.
+- [x] PR creation completed.
+
+## Surprises & Discoveries
+
+- Observation: `target_table` was baked into dataset specs and multiple tests even though load now writes conformed fact rows.
+  Evidence: pre-change references in `src/macro_data_ingest/datasets.py`, `src/macro_data_ingest/load/pipeline.py`, and `tests/test_datasets.py`.
+
+## Decision Log
+
+- Decision: drop compatibility objects idempotently during `ensure_base_objects`.
+  Rationale: guarantees drift-free cleanup across environments without requiring manual SQL.
+  Date/Author: 2026-03-06, codex agent
+- Decision: remove `target_table` from dataset specs and configs.
+  Rationale: avoids stale/ambiguous contract fields that no longer drive load behavior.
+  Date/Author: 2026-03-06, codex agent
+
+## Outcomes & Retrospective
+
+Compatibility surfaces were successfully removed with no regressions in local validation and staging
+runtime checks. The loader now maintains a conformed-only contract, legacy tables/views are dropped
+idempotently, and dataset specs no longer include stale `target_table` fields. One staging Census
+load initially failed because the latest pre-existing Silver object lacked newer Census columns; a
+fresh transform rerun resolved this, confirming no new contract issue in the simplified load path.
+
+## Context and Orientation
+
+Relevant files:
+- `src/macro_data_ingest/load/postgres_loader.py` for DDL, cleanup, and serving view refresh.
+- `src/macro_data_ingest/load/pipeline.py` for conformed-only load orchestration.
+- `src/macro_data_ingest/datasets.py` and `config/datasets*.yaml` for dataset contract simplification.
+- `README.md`, `docs/architecture.md`, `docs/setup.md`, `docs/backfills.md` for operator docs.
+- `tests/*` for parser and pipeline regression coverage.
+
+## Plan of Work
+
+1. Remove compatibility table/view DDL and dual-write behavior from load path.
+2. Remove now-unused `target_table` config surface and align tests.
+3. Remove obsolete metadata backfill script tied to dropped table.
+4. Update documentation to conformed-only serving model.
+5. Run lint/tests and staging pipeline reruns to prove idempotence.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi run-all --env staging --run-id simplify-serving-20260306 --dataset-id pce_state_sapce4
+    .venv/bin/mdi run-all --env staging --run-id simplify-serving-20260306-rerun --dataset-id pce_state_sapce4
+    .venv/bin/mdi run-all --env staging --run-id simplify-serving-20260306 --dataset-id census_state_population
+    .venv/bin/mdi run-all --env staging --run-id simplify-serving-20260306-rerun --dataset-id census_state_population
+
+Expected outcomes:
+- tests/lint pass;
+- load succeeds without compatibility object dependencies;
+- reruns do not create conformed key duplicates.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- no compatibility DDL/write paths remain in `load` code;
+- `serving.v_pce_state_yoy` is removed from view refresh outputs;
+- dataset specs and configs no longer include `target_table`;
+- `mdi run-all` succeeds and remains idempotent on immediate rerun.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Conformed upserts remain key-based on dimensions/fact conflict targets.
+- Legacy object drops use `IF EXISTS` and are rerun-safe.
+
+Recovery:
+- If migration fails mid-load, rerun `mdi load` for the dataset.
+- If serving drift occurs, rerun load to recreate serving views from conformed tables.
+- If historical rows are missing, rebuild from S3 via dataset-scoped reruns.
+
+## Artifacts and Notes
+
+Artifacts:
+- `.agent/features/2026-03-06-remove-compatibility-surfaces/SPEC.md`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `src/macro_data_ingest/load/pipeline.py`
+- `src/macro_data_ingest/datasets.py`
+- `config/datasets.yaml`
+- `config/datasets.example.yaml`
+- `docs/backfills.md`
+- `README.md`
+
+Validation evidence:
+- `make lint test PYTHON=.venv/bin/python` -> `62 passed`.
+- `.venv/bin/mdi load --env staging --run-id simplify-serving-20260306-load-a --dataset-id pce_state_sapce4`
+  and immediate rerun `...-load-b...` both succeeded.
+- `.venv/bin/mdi transform --env staging --run-id simplify-serving-20260306-transform-census --dataset-id census_state_population`
+  followed by load reruns `...-load-census-a...` and `...-load-census-b...` both succeeded.
+- SQL verification:
+  - all legacy objects return `to_regclass(...) = NULL`,
+  - `fact_duplicate_key_groups=0`,
+  - serving rows present for BEA SAPCE4 and Census population datasets.
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `mdi load --env <staging|prod> [--dataset-id <id>]`
+- `mdi run-all --env <staging|prod> --dataset-id <id>`
+
+Dependencies:
+- BEA and Census APIs for live runs,
+- S3 + Postgres connectivity for staging validation.

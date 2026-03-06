@@ -79,8 +79,7 @@ Expected provisioning outputs:
 
 Postgres objects created/refreshed by load include:
 - Conformed `gold` model (`dim_source`, `dim_geo`, `dim_period`, `dim_series`, `dim_vintage`, `fact_macro_observation`)
-- Compatibility `gold.pce_state_annual`, `gold.population_state_annual`, `gold.state_gov_finance_annual`
-- Serving views (`serving.obt_state_macro_annual_latest`, `serving.v_macro_yoy`, `serving.v_pce_state_yoy`, `serving.v_pce_state_per_capita_annual`, `serving.v_state_federal_to_stategov_gdp_annual`, `serving.v_state_federal_to_persons_gdp_annual`)
+- Serving views (`serving.obt_state_macro_annual_latest`, `serving.v_macro_yoy`, `serving.v_pce_state_per_capita_annual`, `serving.v_state_federal_to_stategov_gdp_annual`, `serving.v_state_federal_to_persons_gdp_annual`)
 
 Copy these outputs into:
 - local `.env`
@@ -124,13 +123,6 @@ returns monthly `TimePeriod` rows for the selected table. New series should defa
 ## Standardized Backfills
 
 Use `docs/backfills.md` for approved backfill procedures.
-
-For metadata-only repairs of `function_name` in `gold.pce_state_annual`:
-
-- Dry run:
-  - `python scripts/backfill_function_names.py --env staging --tables SAPCE4 --run-id backfill-function-name-<date>-dryrun --dry-run`
-- Apply:
-  - `python scripts/backfill_function_names.py --env staging --tables SAPCE4 --run-id backfill-function-name-<date>`
 
 ## Rollback / Cleanup Guidance (Manual)
 

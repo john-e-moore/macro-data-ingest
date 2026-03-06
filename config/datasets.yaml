@@ -8,7 +8,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: pce_state_sapce4
     source: bea
@@ -19,7 +18,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_regional_price_parities_sarpp
     source: bea
@@ -30,7 +28,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_real_income_and_pce_sarpi
     source: bea
@@ -41,7 +38,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp1
     source: bea
@@ -52,7 +48,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp2
     source: bea
@@ -63,7 +58,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp3
     source: bea
@@ -74,7 +68,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp4
     source: bea
@@ -85,7 +78,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp5
     source: bea
@@ -96,7 +88,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp6
     source: bea
@@ -107,7 +98,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp7
     source: bea
@@ -118,7 +108,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp8
     source: bea
@@ -129,7 +118,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp9
     source: bea
@@ -140,7 +128,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sagdp11
     source: bea
@@ -151,7 +138,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: state_gdp_sasummary
     source: bea
@@ -162,7 +148,6 @@ datasets:
     bea_start_year: 2000
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: pce_state_sapce4_monthly
     source: bea
@@ -173,7 +158,6 @@ datasets:
     bea_start_year: 2019
     line_code: ALL
     geo_fips: STATE
-    target_table: pce_state_monthly
     enabled: false
   - dataset_id: census_state_population
     source: census
@@ -183,7 +167,6 @@ datasets:
     census_geography: state
     census_start_year: 2000
     census_frequency: A
-    target_table: population_state_annual
     enabled: true
   - dataset_id: state_personal_transfer_receipts_sainc35
     source: bea
@@ -194,7 +177,6 @@ datasets:
     bea_start_year: 2000
     line_code: "2000"
     geo_fips: STATE
-    target_table: pce_state_annual
     enabled: true
   - dataset_id: census_state_gov_finance_federal_intergovernmental_revenue
     source: census
@@ -211,5 +193,4 @@ datasets:
       SVY_COMP: "02"
       GOVTYPE: "002"
       AGG_DESC: SF0004
-    target_table: state_gov_finance_annual
     enabled: true

@@ -26,7 +26,6 @@ def test_run_all_skips_downstream_when_unchanged(monkeypatch) -> None:  # noqa: 
         bea_start_year=2000,
         line_code="ALL",
         geo_fips="STATE",
-        target_table="pce_state_annual",
         enabled=True,
     )
 

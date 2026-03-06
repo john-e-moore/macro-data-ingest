@@ -126,7 +126,7 @@ def cmd_load(args: argparse.Namespace) -> int:
         print(
             "load completed "
             f"dataset_id={spec.dataset_id} run_id={result.run_id} rows={result.row_count} "
-            f"table={result.gold_table} manifest={result.manifest_uri}"
+            f"table={result.conformed_table} manifest={result.manifest_uri}"
         )
     return 0
 
@@ -198,7 +198,7 @@ def cmd_run_all(args: argparse.Namespace) -> int:
         print(
             "load completed "
             f"dataset_id={spec.dataset_id} run_id={load_result.run_id} rows={load_result.row_count} "
-            f"table={load_result.gold_table} manifest={load_result.manifest_uri}"
+            f"table={load_result.conformed_table} manifest={load_result.manifest_uri}"
         )
     return 0
 

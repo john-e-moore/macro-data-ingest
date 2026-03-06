@@ -44,95 +44,6 @@ class PostgresLoader:
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
-        CREATE TABLE IF NOT EXISTS {schema_gold}.pce_state_annual (
-            bea_table_name TEXT NOT NULL,
-            state_fips TEXT NOT NULL,
-            state_abbrev TEXT NOT NULL,
-            geo_name TEXT NOT NULL,
-            frequency TEXT NOT NULL,
-            period_code TEXT NOT NULL,
-            year INTEGER NOT NULL,
-            month INTEGER NULL,
-            quarter INTEGER NULL,
-            line_code TEXT NOT NULL,
-            series_code TEXT NOT NULL,
-            series_name TEXT NOT NULL,
-            function_name TEXT NOT NULL,
-            raw_description TEXT NOT NULL DEFAULT '',
-            hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
-            pce_value DOUBLE PRECISION NOT NULL,
-            pce_value_scaled DOUBLE PRECISION NOT NULL,
-            unit TEXT NOT NULL,
-            unit_mult INTEGER NOT NULL,
-            note_ref TEXT NULL,
-            run_id TEXT NOT NULL,
-            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (bea_table_name, state_fips, year, line_code)
-        );
-
-        CREATE TABLE IF NOT EXISTS {schema_gold}.pce_state_monthly (
-            bea_table_name TEXT NOT NULL,
-            state_fips TEXT NOT NULL,
-            state_abbrev TEXT NOT NULL,
-            geo_name TEXT NOT NULL,
-            frequency TEXT NOT NULL,
-            period_code TEXT NOT NULL,
-            year INTEGER NOT NULL,
-            month INTEGER NOT NULL,
-            quarter INTEGER NULL,
-            line_code TEXT NOT NULL,
-            series_code TEXT NOT NULL,
-            series_name TEXT NOT NULL,
-            function_name TEXT NOT NULL,
-            raw_description TEXT NOT NULL DEFAULT '',
-            hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
-            pce_value DOUBLE PRECISION NOT NULL,
-            pce_value_scaled DOUBLE PRECISION NOT NULL,
-            unit TEXT NOT NULL,
-            unit_mult INTEGER NOT NULL,
-            note_ref TEXT NULL,
-            run_id TEXT NOT NULL,
-            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (bea_table_name, state_fips, period_code, line_code)
-        );
-
-        CREATE TABLE IF NOT EXISTS {schema_gold}.population_state_annual (
-            state_fips TEXT NOT NULL,
-            state_abbrev TEXT NOT NULL,
-            geo_name TEXT NOT NULL,
-            frequency TEXT NOT NULL,
-            period_code TEXT NOT NULL,
-            year INTEGER NOT NULL,
-            population DOUBLE PRECISION NOT NULL,
-            census_dataset_path TEXT NOT NULL,
-            census_variable TEXT NOT NULL,
-            unit TEXT NOT NULL,
-            note_ref TEXT NULL,
-            run_id TEXT NOT NULL,
-            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (state_fips, year, census_variable)
-        );
-
-        CREATE TABLE IF NOT EXISTS {schema_gold}.state_gov_finance_annual (
-            state_fips TEXT NOT NULL,
-            state_abbrev TEXT NOT NULL,
-            geo_name TEXT NOT NULL,
-            frequency TEXT NOT NULL,
-            period_code TEXT NOT NULL,
-            year INTEGER NOT NULL,
-            amount DOUBLE PRECISION NOT NULL,
-            census_dataset_path TEXT NOT NULL,
-            census_variable TEXT NOT NULL,
-            census_series_kind TEXT NOT NULL,
-            census_measure_label TEXT NOT NULL,
-            census_agg_desc TEXT NOT NULL,
-            unit TEXT NOT NULL,
-            note_ref TEXT NULL,
-            run_id TEXT NOT NULL,
-            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            PRIMARY KEY (state_fips, year, census_variable, census_agg_desc)
-        );
-
         CREATE TABLE IF NOT EXISTS {schema_gold}.dim_source (
             source_id BIGSERIAL PRIMARY KEY,
             source_name TEXT NOT NULL,
@@ -241,55 +152,15 @@ class PostgresLoader:
             conn.execute(
                 text(
                     f"""
-                    ALTER TABLE {schema_gold}.pce_state_annual
-                        ADD COLUMN IF NOT EXISTS frequency TEXT,
-                        ADD COLUMN IF NOT EXISTS period_code TEXT,
-                        ADD COLUMN IF NOT EXISTS month INTEGER NULL,
-                        ADD COLUMN IF NOT EXISTS quarter INTEGER NULL,
-                        ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
-                        ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]';
-                    ALTER TABLE {schema_gold}.pce_state_monthly
-                        ADD COLUMN IF NOT EXISTS frequency TEXT,
-                        ADD COLUMN IF NOT EXISTS period_code TEXT,
-                        ADD COLUMN IF NOT EXISTS month INTEGER NULL,
-                        ADD COLUMN IF NOT EXISTS quarter INTEGER NULL,
-                        ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
-                        ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]';
                     ALTER TABLE {schema_gold}.dim_series
                         ADD COLUMN IF NOT EXISTS raw_description TEXT NOT NULL DEFAULT '',
                         ADD COLUMN IF NOT EXISTS hierarchy_path_json TEXT NOT NULL DEFAULT '[]',
                         ADD COLUMN IF NOT EXISTS parse_strategy TEXT NOT NULL DEFAULT 'colon_path';
-
-                    UPDATE {schema_gold}.pce_state_annual
-                    SET
-                        frequency = COALESCE(NULLIF(frequency, ''), 'A'),
-                        period_code = COALESCE(NULLIF(period_code, ''), year::TEXT)
-                    WHERE frequency IS NULL
-                       OR frequency = ''
-                       OR period_code IS NULL
-                       OR period_code = '';
-
-                    UPDATE {schema_gold}.pce_state_monthly
-                    SET
-                        frequency = COALESCE(NULLIF(frequency, ''), 'M'),
-                        period_code = COALESCE(
-                            NULLIF(period_code, ''),
-                            CASE
-                                WHEN month IS NOT NULL THEN year::TEXT || 'M' || LPAD(month::TEXT, 2, '0')
-                                ELSE year::TEXT
-                            END
-                        )
-                    WHERE frequency IS NULL
-                       OR frequency = ''
-                       OR period_code IS NULL
-                       OR period_code = '';
-
-                    ALTER TABLE {schema_gold}.pce_state_annual
-                        ALTER COLUMN frequency SET NOT NULL,
-                        ALTER COLUMN period_code SET NOT NULL;
-                    ALTER TABLE {schema_gold}.pce_state_monthly
-                        ALTER COLUMN frequency SET NOT NULL,
-                        ALTER COLUMN period_code SET NOT NULL;
+                    DROP VIEW IF EXISTS {schema_serving}.v_pce_state_yoy;
+                    DROP TABLE IF EXISTS {schema_gold}.pce_state_monthly;
+                    DROP TABLE IF EXISTS {schema_gold}.pce_state_annual;
+                    DROP TABLE IF EXISTS {schema_gold}.population_state_annual;
+                    DROP TABLE IF EXISTS {schema_gold}.state_gov_finance_annual;
                     """
                 )
             )
@@ -873,42 +744,10 @@ class PostgresLoader:
             for chunk in self._chunked(fact_params, size=5000):
                 conn.execute(fact_sql, chunk)
 
-    def upsert_gold_table(self, table_name: str, frame: pd.DataFrame, pk_cols: list[str]) -> None:
-        if frame.empty:
-            raise ValueError("Gold frame is empty; refusing load.")
-
-        table_name = self._validate_identifier(table_name)
-        schema_gold = self._validate_identifier(self.schema_gold)
-        for col in frame.columns:
-            self._validate_identifier(col)
-        for col in pk_cols:
-            self._validate_identifier(col)
-
-        temp_table = f"tmp_{table_name}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-        temp_table = self._validate_identifier(temp_table)
-        cols = list(frame.columns)
-        cols_csv = ", ".join(cols)
-        update_cols = [col for col in cols if col not in pk_cols]
-        update_set = ", ".join([f"{col} = EXCLUDED.{col}" for col in update_cols])
-        pk_csv = ", ".join(pk_cols)
-
-        with self.engine.begin() as conn:
-            frame.to_sql(temp_table, conn, schema=schema_gold, if_exists="replace", index=False)
-            upsert_sql = f"""
-            INSERT INTO {schema_gold}.{table_name} ({cols_csv})
-            SELECT {cols_csv}
-            FROM {schema_gold}.{temp_table}
-            ON CONFLICT ({pk_csv}) DO UPDATE
-            SET {update_set};
-            DROP TABLE {schema_gold}.{temp_table};
-            """
-            conn.execute(text(upsert_sql))
-
     def create_or_replace_views(self) -> None:
         schema_gold = self._validate_identifier(self.schema_gold)
         schema_serving = self._validate_identifier(self.schema_serving)
         view_sql = f"""
-        DROP VIEW IF EXISTS {schema_serving}.v_pce_state_yoy;
         DROP VIEW IF EXISTS {schema_serving}.v_pce_state_per_capita_annual;
         DROP VIEW IF EXISTS {schema_serving}.v_state_federal_to_stategov_gdp_annual;
         DROP VIEW IF EXISTS {schema_serving}.v_state_federal_to_persons_gdp_annual;
@@ -979,20 +818,6 @@ class PostgresLoader:
            AND cur.state_fips = prev.state_fips
            AND cur.series_code = prev.series_code
            AND cur.year = prev.year + 1;
-
-        CREATE VIEW {schema_serving}.v_pce_state_yoy AS
-        SELECT
-            bea_table_name,
-            state_fips,
-            state_abbrev,
-            geo_name,
-            line_code,
-            year,
-            value_current AS pce_value_current,
-            value_prior AS pce_value_prior,
-            yoy_pct
-        FROM {schema_serving}.v_macro_yoy
-        WHERE source_name = 'BEA';
 
         CREATE VIEW {schema_serving}.v_pce_state_per_capita_annual AS
         WITH bea_rows AS (
