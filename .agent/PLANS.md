@@ -1566,24 +1566,33 @@ configured Census dataset that runs in the same ingest/transform/load pipeline, 
 ## Progress
 
 - [x] (2026-03-06 00:00Z) Initial planning completed.
-- [ ] Source routing + Census ingest/transform/load implementation completed.
-- [ ] Validation and documentation updates completed.
+- [x] Source routing + Census ingest/transform/load implementation completed.
+- [x] Validation and documentation updates completed.
 - [ ] PR opened and linked.
 
 ## Surprises & Discoveries
 
 - Observation: current dataset and stage contracts are BEA-specific (`BeaDatasetSpec`, BEA-only transform/load projections).
   Evidence: `src/macro_data_ingest/datasets.py`, `src/macro_data_ingest/transforms/silver.py`, and `src/macro_data_ingest/load/pipeline.py` currently require BEA fields.
+- Observation: `pep/population` endpoint contracts vary by year/vintage and produced unstable smoke behavior for this integration.
+  Evidence: direct probes showed 404s on several year paths and schema drift (`NAME`/`POP` vs `GEONAME`/year-specific variables).
 
 ## Decision Log
 
 - Decision: keep BEA compatibility tables/views unchanged while adding Census through source routing and additive tables/views.
   Rationale: minimizes regression risk and keeps the first non-BEA integration lightweight.
   Date/Author: 2026-03-06, codex agent
+- Decision: use `acs/acs1` `B01003_001E` for the first Census population denominator slice.
+  Rationale: stable annual schema across years with straightforward state-level API contracts.
+  Date/Author: 2026-03-06, codex agent
 
 ## Outcomes & Retrospective
 
-Pending implementation.
+Completed end-to-end integration for the first Census population source with mixed-source routing
+across ingest/transform/load and additive Postgres serving outputs. Local lint/tests passed
+(`56 passed`), staging Census run-all succeeded through load, and Postgres verification confirmed
+`gold.population_state_annual` + `serving.v_pce_state_per_capita_annual` output. BEA regression
+validation succeeded with non-smoke `run-all` (unchanged payload path).
 
 ## Context and Orientation
 
@@ -1650,6 +1659,12 @@ Planned artifacts:
 - `.env.template`
 - `README.md`, `docs/architecture.md`, `docs/operability.md`
 - tests under `tests/` for datasets, ingest, transform, and load routing
+
+Validation evidence:
+- `make lint test PYTHON=.venv/bin/python` -> `All checks passed!`, `56 passed`.
+- `.venv/bin/mdi run-all --env staging --smoke --dataset-id census_state_population` -> ingest/transform/load success (`rows=204`, `table=gold.population_state_annual`).
+- `.venv/bin/mdi run-all --env staging --dataset-id pce_state_sapce4` -> ingest success and unchanged hash skip (`changed=False`) with no regression in BEA path.
+- Postgres verification query -> `population_rows=204`, non-null per-capita joined rows in `serving.v_pce_state_per_capita_annual`.
 
 ## Interfaces and Dependencies
 
