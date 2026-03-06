@@ -1793,7 +1793,7 @@ Dependencies:
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.
 
-Links: branch `feature/bea-sagdp-series`; feature brief `.agent/features/2026-03-06-bea-sagdp-series/SPEC.md`; PR URL `(pending)`.
+Links: branch `feature/bea-sagdp-series`; feature brief `.agent/features/2026-03-06-bea-sagdp-series/SPEC.md`; PR URL `https://github.com/john-e-moore/macro-data-ingest/pull/15`.
 
 ## Purpose / Big Picture
 
@@ -1805,7 +1805,7 @@ returned by BEA while using existing Bronze/Silver/Gold/load contracts.
 
 - [x] (2026-03-06 00:00Z) Initial planning completed.
 - [x] Config/docs/tests implementation completed.
-- [ ] Validation, runtime evidence capture, and PR creation completed.
+- [x] Validation, runtime evidence capture, and PR creation completed.
 
 ## Surprises & Discoveries
 
@@ -1823,8 +1823,10 @@ returned by BEA while using existing Bronze/Silver/Gold/load contracts.
 
 ## Outcomes & Retrospective
 
-In progress. Config/docs/tests are updated; validation evidence and PR link will be added after
-staging runs complete.
+Completed end-to-end. All 11 datasets ran successfully through `mdi run-all --env staging`
+(ingest/transform/load), row counts were non-zero for each table, and conformed-model unit checks
+show non-empty units with expected variety (levels, indexes, percent-change/percentage-point units
+where available from BEA metadata).
 
 ## Context and Orientation
 
@@ -1890,6 +1892,14 @@ Recovery:
 - `docs/setup.md`
 - `docs/spec.md`
 - `docs/architecture.md`
+
+Validation evidence snapshot:
+- `make lint test PYTHON=.venv/bin/python` -> `61 passed`.
+- Staging `run-all` completed for each of:
+  `state_gdp_sagdp1..state_gdp_sagdp9`, `state_gdp_sagdp11`, `state_gdp_sasummary`.
+- Conformed table checks show unit coverage including:
+  `Millions of current dollars`, `Millions of chained 2017 dollars`, `Quantity index`,
+  `Percent change`, `Percentage points`, and `Index`.
 
 ## Interfaces and Dependencies
 
