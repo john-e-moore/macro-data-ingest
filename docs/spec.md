@@ -31,12 +31,16 @@
 ## Dataset Scope
 
 Initial scope:
-- BEA PCE by State (configurable table/line categories and time ranges).
+- BEA state-level macro tables in the `Regional` dataset, including:
+  - PCE by state (`SAPCE1`, `SAPCE4`)
+  - Regional price parities by state (`SARPP`)
+  - Real personal income and real PCE by state (`SARPI`)
 
 Config-driven dimensions:
 - frequency (annual and monthly supported)
 - dataset/table identifiers
 - geography selection (all states by default)
 - optional category allowlist
+- start year (`*_start_year`), with `2000` as the default baseline for new series
 
 Future sources (BLS, Census, IRS) are tracked separately and not part of MVP.

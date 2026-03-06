@@ -212,6 +212,7 @@ Include these practices without over-engineering:
   - Geography: two-letter state abbreviation + FIPS where available
   - Time: year (and other grain if present)
   - Category: stable identifiers from BEA metadata
+- **Start-year policy**: For new source series, default `*_START_YEAR` / `*_start_year` to `2000` unless a tighter range is explicitly required.
 - **Postgres modeling strategy**:
   - Maintain reusable conformed dimensions and a core fact table in `gold`.
   - Keep analyst/API-friendly denormalized contracts in `serving`.

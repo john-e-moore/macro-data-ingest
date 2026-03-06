@@ -113,11 +113,12 @@ Recommended optional secrets (override defaults when needed):
 - `BEA_START_YEAR` (default `2000`; ingestion requests this year through current year)
 
 `config/datasets.yaml` is the canonical source for daily runs. By default it includes
-annual `SAPCE1`/`SAPCE4` with `line_code: ALL` and Census annual state population
-(`dataset_path: acs/acs1`, `variable: B01003_001E`, `start_year: 2000`; pre-2005 rows
-are backfilled from Census intercensal estimates). It also includes a disabled monthly
-SAPCE4 entry staged for future enablement once BEA returns monthly `TimePeriod` rows
-for the selected table.
+annual BEA state tables `SAPCE1`, `SAPCE4`, `SARPP`, and `SARPI` with `line_code: ALL`
+plus Census annual state population (`dataset_path: acs/acs1`, `variable: B01003_001E`,
+`start_year: 2000`; pre-2005 rows are backfilled from Census intercensal estimates).
+It also includes a disabled monthly SAPCE4 entry staged for future enablement once BEA
+returns monthly `TimePeriod` rows for the selected table. New series should default to
+`*_start_year: 2000` unless explicitly scoped tighter.
 
 ## Standardized Backfills
 

@@ -1682,3 +1682,106 @@ Dependencies:
 ## Optional: Active ExecPlan Index
 
 - `2026-03-06 - Census State Population Source Integration - status: done - owner: codex agent`
+- `2026-03-06 - BEA SARPP and SARPI Series Integration - status: in progress - owner: codex agent`
+
+---
+
+# BEA SARPP and SARPI Series Integration
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/bea-sarpp-sarpi-series`; feature brief `.agent/features/2026-03-06-bea-sarpp-sarpi/SPEC.md`; PR URL `(pending)`.
+
+## Purpose / Big Picture
+
+Integrate additional BEA state-level real series into the default ingest configuration so the
+pipeline collects SARPP and SARPI data (including real income and real PCE per-capita variants)
+without introducing any Census join dependency. The observable outcome is successful ingest runs
+for new dataset IDs with year coverage starting at 2000 by default.
+
+## Progress
+
+- [x] (2026-03-06 00:00Z) Initial planning completed.
+- [x] Config and docs implementation completed.
+- [ ] Validation and PR creation completed.
+
+## Surprises & Discoveries
+
+- Observation: the requested four real metrics are all line codes in one BEA table (`SARPI`).
+  Evidence: BEA metadata endpoint returned `SARPI` line codes 1-4.
+
+## Decision Log
+
+- Decision: add two datasets (`SARPP`, `SARPI`) with `line_code: ALL` instead of separate per-line dataset entries.
+  Rationale: keeps config compact while still ingesting all requested series.
+  Date/Author: 2026-03-06, codex agent
+- Decision: codify "2000 default start year for new series" in both project and agent spec docs.
+  Rationale: makes baseline history policy explicit for future series additions.
+  Date/Author: 2026-03-06, codex agent
+
+## Outcomes & Retrospective
+
+In progress. Config and docs updates are complete; remaining work is runtime validation, ingest
+evidence review, and PR creation.
+
+## Context and Orientation
+
+Relevant files:
+- `config/datasets.yaml` and `config/datasets.example.yaml` for dataset registration.
+- `docs/spec.md`, `docs/setup.md`, `docs/architecture.md`, and `README.md` for operator-facing behavior.
+- `tests/test_datasets.py` for dataset-spec parsing coverage.
+
+## Plan of Work
+
+1. Add enabled BEA dataset configs for `SARPP` and `SARPI` with `bea_start_year: 2000`.
+2. Update docs/spec to include new series and the default start-year policy.
+3. Add/extend tests for dataset config parsing.
+4. Run lint/tests and staging ingest for both new dataset IDs.
+5. Draft PR with validation evidence and risk notes.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi ingest --env staging --run-id bea-sarpp-20260306 --dataset-id state_regional_price_parities_sarpp
+    .venv/bin/mdi ingest --env staging --run-id bea-sarpi-20260306 --dataset-id state_real_income_and_pce_sarpi
+
+Expected outcomes:
+- tests pass;
+- both ingest commands complete with non-zero rows;
+- requested year range starts at 2000.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- `SARPP` and `SARPI` appear in enabled default datasets.
+- default start year for these new entries is 2000.
+- tests pass after config/doc updates.
+- staging ingest succeeds for both new dataset IDs.
+
+## Idempotence and Recovery
+
+Idempotence:
+- existing payload-hash checkpoints remain unchanged and gate rewrites for each dataset ID.
+
+Recovery:
+- if BEA/API call fails transiently, rerun ingest with same dataset ID and a new `run_id`.
+- rollback by disabling/removing dataset entries in config.
+
+## Artifacts and Notes
+
+- `.agent/features/2026-03-06-bea-sarpp-sarpi/SPEC.md`
+- `config/datasets.yaml`
+- `config/datasets.example.yaml`
+- `docs/spec.md`
+- `tests/test_datasets.py`
+
+## Interfaces and Dependencies
+
+Interfaces:
+- dataset IDs `state_regional_price_parities_sarpp`, `state_real_income_and_pce_sarpi`
+- CLI: `mdi ingest --dataset-id <id>`
+
+Dependencies:
+- BEA API `Regional` metadata and data endpoints
+- existing S3 Bronze writer/checkpoint flow
