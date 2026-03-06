@@ -20,6 +20,7 @@ class AppConfig:
     s3_prefix_root: str
     github_repo: str
     bea_api_key: str
+    census_api_key: str
     bea_dataset: str
     bea_table_name: str
     bea_frequency: str
@@ -53,6 +54,7 @@ def load_config() -> AppConfig:
         s3_prefix_root=os.getenv("S3_PREFIX_ROOT", "staging"),
         github_repo=os.getenv("GITHUB_REPO", ""),
         bea_api_key=os.getenv("BEA_API_KEY", ""),
+        census_api_key=os.getenv("CENSUS_API_KEY", ""),
         bea_dataset=os.getenv("BEA_DATASET", "Regional"),
         bea_table_name=os.getenv("BEA_TABLE_NAME", "SAPCE4"),
         bea_frequency=os.getenv("BEA_FREQUENCY", "A"),

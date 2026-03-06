@@ -11,8 +11,12 @@ import boto3
 import pandas as pd
 
 from macro_data_ingest.config import AppConfig
-from macro_data_ingest.datasets import BeaDatasetSpec
+from macro_data_ingest.datasets import BeaDatasetSpec, CensusDatasetSpec, DatasetSpec
 from macro_data_ingest.run_metadata import utc_now_iso
+from macro_data_ingest.transforms.census_silver import (
+    to_census_silver_frame,
+    validate_census_silver_frame,
+)
 from macro_data_ingest.transforms.silver import to_silver_frame, validate_silver_frame
 
 LOGGER = logging.getLogger(__name__)
@@ -79,7 +83,7 @@ def _write_json_to_s3(s3_client: Any, bucket: str, key: str, payload: dict[str, 
 def run_transform(
     config: AppConfig,
     run_id: str,
-    dataset_spec: BeaDatasetSpec,
+    dataset_spec: DatasetSpec,
     smoke: bool = False,
 ) -> TransformResult:
     del smoke  # reserved for future parameterized transforms
@@ -100,12 +104,18 @@ def run_transform(
     )
     payload = _read_json_from_s3(s3, config.s3_data_bucket, payload_key)
 
-    silver_frame = to_silver_frame(
-        payload,
-        bea_table_name=dataset_spec.bea_table_name,
-        bea_frequency=dataset_spec.bea_frequency,
-    )
-    validate_silver_frame(silver_frame)
+    if isinstance(dataset_spec, BeaDatasetSpec):
+        silver_frame = to_silver_frame(
+            payload,
+            bea_table_name=dataset_spec.bea_table_name,
+            bea_frequency=dataset_spec.bea_frequency,
+        )
+        validate_silver_frame(silver_frame)
+    elif isinstance(dataset_spec, CensusDatasetSpec):
+        silver_frame = to_census_silver_frame(payload, dataset_spec)
+        validate_census_silver_frame(silver_frame)
+    else:
+        raise ValueError(f"Unsupported dataset source for transform: {dataset_spec.source}")
 
     silver_key = (
         f"{config.s3_prefix_root}/silver/{source}/{dataset}/"
@@ -121,7 +131,6 @@ def run_transform(
         "dataset": dataset,
         "dataset_id": dataset_spec.dataset_id,
         "storage_dataset": dataset_spec.storage_dataset,
-        "bea_table_name": dataset_spec.bea_table_name,
         "extracted_at_utc": utc_now_iso(),
         "input_payload_uri": f"s3://{config.s3_data_bucket}/{payload_key}",
         "row_count": int(len(silver_frame)),
@@ -132,6 +141,11 @@ def run_transform(
         },
         "output_partitions": [silver_uri],
     }
+    if isinstance(dataset_spec, BeaDatasetSpec):
+        manifest["bea_table_name"] = dataset_spec.bea_table_name
+    if isinstance(dataset_spec, CensusDatasetSpec):
+        manifest["census_dataset_path"] = dataset_spec.census_dataset_path
+        manifest["census_variable"] = dataset_spec.census_variable
     manifest_key = (
         f"{config.s3_prefix_root}/silver/{source}/{dataset}/"
         f"extract_date={extract_date}/run_id={run_id}/manifest.json"

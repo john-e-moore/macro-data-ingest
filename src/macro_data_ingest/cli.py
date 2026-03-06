@@ -5,7 +5,7 @@ import logging
 import uuid
 
 from macro_data_ingest.config import load_config
-from macro_data_ingest.datasets import BeaDatasetSpec, load_dataset_specs
+from macro_data_ingest.datasets import DatasetSpec, load_dataset_specs
 from macro_data_ingest.ingest.pipeline import IngestResult, run_ingest
 from macro_data_ingest.load.pipeline import run_load
 from macro_data_ingest.logging_utils import configure_logging
@@ -31,7 +31,7 @@ def _resolve_run_id(run_id: str | None) -> str:
     return run_id if run_id else f"run-{uuid.uuid4()}"
 
 
-def _resolve_specs(config_path_args: argparse.Namespace) -> list[BeaDatasetSpec]:
+def _resolve_specs(config_path_args: argparse.Namespace) -> list[DatasetSpec]:
     config = load_config()
     specs = load_dataset_specs(config)
     dataset_id = getattr(config_path_args, "dataset_id", None)
@@ -50,7 +50,7 @@ def _dataset_run_id(base_run_id: str, dataset_id: str) -> str:
 def _run_ingest_stage(
     args: argparse.Namespace,
     config,
-    dataset_spec: BeaDatasetSpec,
+    dataset_spec: DatasetSpec,
     run_id: str,
 ) -> IngestResult:
     return run_ingest(config=config, run_id=run_id, dataset_spec=dataset_spec, smoke=args.smoke)

@@ -60,7 +60,8 @@ Use the following default workflow for substantial feature work:
 3. Create or update an ExecPlan in `.agent/PLANS.md` and link to the feature brief.
 4. Implement in reviewable increments and keep the ExecPlan progress/decisions current.
 5. Run lint/tests/smoke checks and capture concise evidence.
-6. Open a PR using `.agent/PR_TEMPLATE.md`.
+6. If a generated plan exists for the work under `.cursor/plans/`, add that plan file to version control in the feature branch.
+7. Open a PR using `.agent/PR_TEMPLATE.md`.
 
 Feature briefs should be concise and should not duplicate repository-wide requirements from `.agent/SPEC.md`.
 They should define scope, acceptance criteria, constraints, non-goals, and rollout/rollback notes specific to that feature.

@@ -21,3 +21,13 @@ datasets:
     geo_fips: STATE
     target_table: pce_state_monthly
     enabled: false
+  - dataset_id: census_state_population
+    source: census
+    storage_dataset: population_state
+    census_dataset_path: acs/acs1
+    census_variable: B01003_001E
+    census_geography: state
+    census_start_year: 2005
+    census_frequency: A
+    target_table: population_state_annual
+    enabled: true
