@@ -12,9 +12,13 @@ import boto3
 import pandas as pd
 
 from macro_data_ingest.config import AppConfig
-from macro_data_ingest.datasets import BeaDatasetSpec
+from macro_data_ingest.datasets import BeaDatasetSpec, CensusDatasetSpec, DatasetSpec
 from macro_data_ingest.load.postgres_loader import PostgresLoader
 from macro_data_ingest.run_metadata import utc_now_iso
+from macro_data_ingest.transforms.census_gold import (
+    to_census_gold_frame,
+    to_conformed_population_observation_frame,
+)
 from macro_data_ingest.transforms.gold import to_conformed_observation_frame, to_gold_frame
 
 LOGGER = logging.getLogger(__name__)
@@ -87,7 +91,7 @@ def _extract_vintage_tag_from_silver_key(silver_key: str) -> str:
 def run_load(
     config: AppConfig,
     run_id: str,
-    dataset_spec: BeaDatasetSpec,
+    dataset_spec: DatasetSpec,
     smoke: bool = False,
 ) -> LoadResult:
     del smoke  # reserved for future load variations
@@ -107,17 +111,36 @@ def run_load(
         dataset=dataset,
     )
     silver_frame = _read_parquet_from_s3(s3, config.s3_data_bucket, silver_key)
-    gold_frame = to_gold_frame(silver_frame)
-    if gold_frame.empty:
-        raise ValueError("Gold frame is empty; cannot load to Postgres.")
-    dataset_frequency = str(dataset_spec.bea_frequency).strip().upper()
     vintage_tag = _extract_vintage_tag_from_silver_key(silver_key)
-    conformed_frame = to_conformed_observation_frame(
-        gold_frame,
-        source_name=dataset_spec.source,
-        dataset_id=dataset_spec.dataset_id,
-        vintage_tag=vintage_tag,
-    )
+    if isinstance(dataset_spec, BeaDatasetSpec):
+        gold_frame = to_gold_frame(silver_frame)
+        if gold_frame.empty:
+            raise ValueError("Gold frame is empty; cannot load to Postgres.")
+        dataset_frequency = str(dataset_spec.bea_frequency).strip().upper()
+        conformed_frame = to_conformed_observation_frame(
+            gold_frame,
+            source_name=dataset_spec.source,
+            dataset_id=dataset_spec.dataset_id,
+            vintage_tag=vintage_tag,
+        )
+        pk_cols = (
+            ["bea_table_name", "state_fips", "period_code", "line_code"]
+            if dataset_frequency == "M"
+            else ["bea_table_name", "state_fips", "year", "line_code"]
+        )
+    elif isinstance(dataset_spec, CensusDatasetSpec):
+        gold_frame = to_census_gold_frame(silver_frame)
+        if gold_frame.empty:
+            raise ValueError("Census Gold frame is empty; cannot load to Postgres.")
+        conformed_frame = to_conformed_population_observation_frame(
+            gold_frame,
+            source_name=dataset_spec.source,
+            dataset_id=dataset_spec.dataset_id,
+            vintage_tag=vintage_tag,
+        )
+        pk_cols = ["state_fips", "year", "census_variable"]
+    else:
+        raise ValueError(f"Unsupported dataset source for load: {dataset_spec.source}")
     gold_frame["run_id"] = run_id
 
     loader = PostgresLoader(
@@ -126,11 +149,6 @@ def run_load(
         schema_meta=config.pg_schema_meta,
     )
     loader.ensure_base_objects()
-    pk_cols = (
-        ["bea_table_name", "state_fips", "period_code", "line_code"]
-        if dataset_frequency == "M"
-        else ["bea_table_name", "state_fips", "year", "line_code"]
-    )
     loader.upsert_gold_table(
         table_name=dataset_spec.target_table,
         frame=gold_frame,
@@ -150,11 +168,11 @@ def run_load(
             "pipeline_run_id": run_id,
             "dataset_id": dataset_spec.dataset_id,
             "storage_dataset": dataset_spec.storage_dataset,
-            "bea_table_name": dataset_spec.bea_table_name,
             "source_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
             "row_count": int(len(gold_frame)),
             "gold_table": f"{config.pg_schema_gold}.{dataset_spec.target_table}",
             "loaded_at_utc": utc_now_iso(),
+            "source": dataset_spec.source,
         },
     )
     LOGGER.info("loaded gold table into postgres", extra={"run_id": run_id, "stage": "load"})
@@ -166,7 +184,6 @@ def run_load(
         "dataset": dataset,
         "dataset_id": dataset_spec.dataset_id,
         "storage_dataset": dataset_spec.storage_dataset,
-        "bea_table_name": dataset_spec.bea_table_name,
         "extracted_at_utc": utc_now_iso(),
         "input_silver_uri": f"s3://{config.s3_data_bucket}/{silver_key}",
         "row_count": int(len(gold_frame)),
@@ -175,8 +192,14 @@ def run_load(
             "serving.obt_state_macro_annual_latest",
             "serving.v_macro_yoy",
             "serving.v_pce_state_yoy",
+            "serving.v_pce_state_per_capita_annual",
         ],
     }
+    if isinstance(dataset_spec, BeaDatasetSpec):
+        manifest["bea_table_name"] = dataset_spec.bea_table_name
+    if isinstance(dataset_spec, CensusDatasetSpec):
+        manifest["census_dataset_path"] = dataset_spec.census_dataset_path
+        manifest["census_variable"] = dataset_spec.census_variable
     manifest_key = (
         f"{config.s3_prefix_root}/gold/{source}/{dataset}/"
         f"extract_date={extract_date}/run_id={run_id}/manifest.json"

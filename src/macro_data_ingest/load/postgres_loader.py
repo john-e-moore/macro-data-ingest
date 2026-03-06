@@ -96,6 +96,23 @@ class PostgresLoader:
             PRIMARY KEY (bea_table_name, state_fips, period_code, line_code)
         );
 
+        CREATE TABLE IF NOT EXISTS {schema_gold}.population_state_annual (
+            state_fips TEXT NOT NULL,
+            state_abbrev TEXT NOT NULL,
+            geo_name TEXT NOT NULL,
+            frequency TEXT NOT NULL,
+            period_code TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            population DOUBLE PRECISION NOT NULL,
+            census_dataset_path TEXT NOT NULL,
+            census_variable TEXT NOT NULL,
+            unit TEXT NOT NULL,
+            note_ref TEXT NULL,
+            run_id TEXT NOT NULL,
+            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (state_fips, year, census_variable)
+        );
+
         CREATE TABLE IF NOT EXISTS {schema_gold}.dim_source (
             source_id BIGSERIAL PRIMARY KEY,
             source_name TEXT NOT NULL,
@@ -872,6 +889,7 @@ class PostgresLoader:
         schema_serving = self._validate_identifier(self.schema_serving)
         view_sql = f"""
         DROP VIEW IF EXISTS {schema_serving}.v_pce_state_yoy;
+        DROP VIEW IF EXISTS {schema_serving}.v_pce_state_per_capita_annual;
         DROP VIEW IF EXISTS {schema_serving}.v_macro_yoy;
         DROP VIEW IF EXISTS {schema_serving}.obt_state_macro_annual_latest;
 
@@ -953,6 +971,45 @@ class PostgresLoader:
             yoy_pct
         FROM {schema_serving}.v_macro_yoy
         WHERE source_name = 'BEA';
+
+        CREATE VIEW {schema_serving}.v_pce_state_per_capita_annual AS
+        WITH bea_rows AS (
+            SELECT *
+            FROM {schema_serving}.obt_state_macro_annual_latest
+            WHERE source_name = 'BEA'
+        ),
+        population_rows AS (
+            SELECT
+                state_fips,
+                year,
+                pce_value_scaled AS population,
+                vintage_tag AS population_vintage_tag
+            FROM {schema_serving}.obt_state_macro_annual_latest
+            WHERE source_name = 'CENSUS'
+        )
+        SELECT
+            b.bea_table_name,
+            b.state_fips,
+            b.state_abbrev,
+            b.geo_name,
+            b.year,
+            b.line_code,
+            b.series_code,
+            b.series_name,
+            b.function_name,
+            b.unit AS bea_unit,
+            b.pce_value,
+            b.pce_value_scaled,
+            p.population,
+            p.population_vintage_tag,
+            CASE
+                WHEN p.population IS NULL OR p.population = 0 THEN NULL
+                ELSE b.pce_value_scaled / p.population
+            END AS value_per_capita
+        FROM bea_rows b
+        LEFT JOIN population_rows p
+            ON b.state_fips = p.state_fips
+           AND b.year = p.year;
         """
         with self.engine.begin() as conn:
             conn.execute(text(view_sql))

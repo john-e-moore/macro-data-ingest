@@ -49,3 +49,13 @@ def stable_rows_hash(rows: list[dict[str, Any]]) -> str:
     )
     encoded = dumps(normalized_rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return sha256(encoded).hexdigest()
+
+
+def stable_records_hash(records: list[dict[str, Any]]) -> str:
+    """Compute deterministic hash for generic record lists."""
+    normalized_records = [dict(sorted(record.items())) for record in records]
+    normalized_records.sort(
+        key=lambda record: dumps(record, sort_keys=True, separators=(",", ":"))
+    )
+    encoded = dumps(normalized_records, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return sha256(encoded).hexdigest()

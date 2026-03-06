@@ -7,10 +7,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from macro_data_ingest.config import AppConfig
-from macro_data_ingest.datasets import BeaDatasetSpec
+from macro_data_ingest.datasets import BeaDatasetSpec, CensusDatasetSpec, DatasetSpec
 from macro_data_ingest.ingest.bea_client import BeaClient, BeaQuery
+from macro_data_ingest.ingest.census_client import CensusClient
 from macro_data_ingest.ingest.bronze_writer import BronzeWriter
-from macro_data_ingest.run_metadata import RunManifest, stable_rows_hash, utc_now_iso
+from macro_data_ingest.run_metadata import RunManifest, stable_records_hash, stable_rows_hash, utc_now_iso
 
 LOGGER = logging.getLogger(__name__)
 
@@ -58,6 +59,17 @@ def _bea_query(spec: BeaDatasetSpec, smoke: bool) -> BeaQuery:
         geo_fips=spec.geo_fips,
         line_code=spec.line_code,
     )
+
+
+def _year_list(start_year: int, smoke: bool) -> list[int]:
+    current_year = datetime.now(timezone.utc).year
+    if start_year > current_year:
+        raise ValueError(f"CENSUS_START_YEAR={start_year} is after current year {current_year}.")
+    if start_year < 1900:
+        raise ValueError("CENSUS_START_YEAR must be >= 1900.")
+    if smoke:
+        return [current_year]
+    return list(range(start_year, current_year + 1))
 
 
 def _fetch_payload(
@@ -171,21 +183,14 @@ def _validate_requested_frequency(rows: list[dict[str, Any]], requested_frequenc
     )
 
 
-def run_ingest(
+def _build_bea_ingest_payload(
+    *,
     config: AppConfig,
-    run_id: str,
     dataset_spec: BeaDatasetSpec,
-    smoke: bool = False,
-) -> IngestResult:
+    smoke: bool,
+) -> tuple[dict[str, Any], list[dict[str, Any]], str, dict[str, str], str | None]:
     if not config.bea_api_key:
-        raise ValueError("BEA_API_KEY is required for ingest.")
-    if not config.s3_data_bucket:
-        raise ValueError("S3_DATA_BUCKET is required for ingest.")
-
-    source = dataset_spec.source
-    dataset = dataset_spec.dataset_id
-    extract_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
+        raise ValueError("BEA_API_KEY is required for BEA ingest.")
     query = _bea_query(dataset_spec, smoke=smoke)
     client = BeaClient(api_key=config.bea_api_key)
     payload, query, rows = _fetch_payload(client, query, smoke=smoke)
@@ -197,6 +202,94 @@ def run_ingest(
         )
     _validate_requested_frequency(rows, dataset_spec.bea_frequency)
     payload_hash = stable_rows_hash(rows)
+    request_params = {
+        "dataset": query.dataset,
+        "table_name": query.table_name,
+        "frequency": query.frequency,
+        "year": query.year,
+        "geo_fips": query.geo_fips,
+        "line_code": query.line_code,
+    }
+    return payload, rows, payload_hash, request_params, _source_release_tag(payload)
+
+
+def _build_census_ingest_payload(
+    *,
+    config: AppConfig,
+    dataset_spec: CensusDatasetSpec,
+    smoke: bool,
+) -> tuple[dict[str, Any], list[dict[str, Any]], str, dict[str, str], str | None]:
+    if not config.census_api_key:
+        raise ValueError("CENSUS_API_KEY is required for Census ingest.")
+    client = CensusClient(api_key=config.census_api_key)
+    years = _year_list(dataset_spec.census_start_year, smoke=smoke)
+    if smoke:
+        current_year = datetime.now(timezone.utc).year
+        floor_year = max(dataset_spec.census_start_year, current_year - 5)
+        years = list(range(current_year, floor_year - 1, -1))
+    rows = client.fetch_state_population(
+        years=years,
+        dataset_path=dataset_spec.census_dataset_path,
+        variable=dataset_spec.census_variable,
+    )
+    if not rows:
+        raise ValueError(
+            "Census returned zero rows for ingest query "
+            f"dataset_path={dataset_spec.census_dataset_path} years={years} "
+            f"geography={dataset_spec.census_geography} variable={dataset_spec.census_variable}."
+        )
+    payload = {
+        "CENSUSAPI": {
+            "Results": {
+                "Data": rows,
+            },
+            "Request": {
+                "dataset_path": dataset_spec.census_dataset_path,
+                "variable": dataset_spec.census_variable,
+                "geography": dataset_spec.census_geography,
+                "years": years,
+            },
+        }
+    }
+    requested_year_range = (
+        str(years[0]) if len(years) == 1 else f"{years[0]}-{years[-1]}"
+    )
+    request_params = {
+        "dataset_path": dataset_spec.census_dataset_path,
+        "variable": dataset_spec.census_variable,
+        "geography": dataset_spec.census_geography,
+        "year_range": requested_year_range,
+    }
+    return payload, rows, stable_records_hash(rows), request_params, None
+
+
+def run_ingest(
+    config: AppConfig,
+    run_id: str,
+    dataset_spec: DatasetSpec,
+    smoke: bool = False,
+) -> IngestResult:
+    if not config.s3_data_bucket:
+        raise ValueError("S3_DATA_BUCKET is required for ingest.")
+
+    source = dataset_spec.source.strip().lower()
+    dataset = dataset_spec.dataset_id
+    extract_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    if source == "bea" and isinstance(dataset_spec, BeaDatasetSpec):
+        payload, rows, payload_hash, request_params, source_release_tag = _build_bea_ingest_payload(
+            config=config,
+            dataset_spec=dataset_spec,
+            smoke=smoke,
+        )
+    elif source == "census" and isinstance(dataset_spec, CensusDatasetSpec):
+        payload, rows, payload_hash, request_params, source_release_tag = _build_census_ingest_payload(
+            config=config,
+            dataset_spec=dataset_spec,
+            smoke=smoke,
+        )
+    else:
+        raise ValueError(f"Unsupported dataset source for ingest: {dataset_spec.source}")
 
     writer = BronzeWriter(
         bucket=config.s3_data_bucket,
@@ -237,7 +330,7 @@ def run_ingest(
         payload_hash=payload_hash,
         run_id=run_id,
         extracted_at_utc=extracted_at_utc,
-        requested_year_range=query.year,
+        requested_year_range=str(request_params.get("year") or request_params.get("year_range") or ""),
         previous_payload_hash=previous_payload_hash,
         source_release_tag=source_release_tag,
     )
@@ -248,14 +341,7 @@ def run_ingest(
         source=source,
         dataset=dataset,
         extracted_at_utc=extracted_at_utc,
-        request_params={
-            "dataset": query.dataset,
-            "table_name": query.table_name,
-            "frequency": query.frequency,
-            "year": query.year,
-            "geo_fips": query.geo_fips,
-            "line_code": query.line_code,
-        },
+        request_params=request_params,
         row_count=len(rows),
         payload_hash=payload_hash,
         output_partitions=[raw_uri] if raw_uri else [],
@@ -263,10 +349,14 @@ def run_ingest(
     manifest["changed"] = changed
     manifest["storage_dataset"] = dataset_spec.storage_dataset
     manifest["dataset_id"] = dataset_spec.dataset_id
-    manifest["bea_table_name"] = dataset_spec.bea_table_name
+    if isinstance(dataset_spec, BeaDatasetSpec):
+        manifest["bea_table_name"] = dataset_spec.bea_table_name
+    if isinstance(dataset_spec, CensusDatasetSpec):
+        manifest["census_dataset_path"] = dataset_spec.census_dataset_path
+        manifest["census_variable"] = dataset_spec.census_variable
     manifest["checkpoint_uri"] = checkpoint_uri
     manifest["vintage"] = {
-        "requested_year_range": query.year,
+        "requested_year_range": str(request_params.get("year") or request_params.get("year_range") or ""),
         "source_release_tag": source_release_tag,
         "previous_payload_hash": previous_payload_hash,
     }
