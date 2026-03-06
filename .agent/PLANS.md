@@ -1547,3 +1547,123 @@ Interfaces:
 Dependencies:
 - No new runtime dependencies.
 - Existing serving views remain compatible with additive hierarchy metadata.
+
+---
+
+# Census State Population Source Integration
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/census-state-population-source`; feature brief `.agent/features/2026-03-06-census-state-population/SPEC.md`; PR URL `(pending)`.
+
+## Purpose / Big Picture
+
+Integrate US Census annual state population as the first non-BEA source so BEA series can be
+joined against a stable denominator for per-capita metrics. The observable outcome is a new
+configured Census dataset that runs in the same ingest/transform/load pipeline, lands in
+`gold.population_state_annual`, and is exposed in a serving per-capita view.
+
+## Progress
+
+- [x] (2026-03-06 00:00Z) Initial planning completed.
+- [ ] Source routing + Census ingest/transform/load implementation completed.
+- [ ] Validation and documentation updates completed.
+- [ ] PR opened and linked.
+
+## Surprises & Discoveries
+
+- Observation: current dataset and stage contracts are BEA-specific (`BeaDatasetSpec`, BEA-only transform/load projections).
+  Evidence: `src/macro_data_ingest/datasets.py`, `src/macro_data_ingest/transforms/silver.py`, and `src/macro_data_ingest/load/pipeline.py` currently require BEA fields.
+
+## Decision Log
+
+- Decision: keep BEA compatibility tables/views unchanged while adding Census through source routing and additive tables/views.
+  Rationale: minimizes regression risk and keeps the first non-BEA integration lightweight.
+  Date/Author: 2026-03-06, codex agent
+
+## Outcomes & Retrospective
+
+Pending implementation.
+
+## Context and Orientation
+
+Relevant paths:
+- `src/macro_data_ingest/datasets.py` for dataset parsing and spec validation,
+- `src/macro_data_ingest/ingest/*` for source clients and Bronze write orchestration,
+- `src/macro_data_ingest/transforms/*` for source-to-Silver and Silver-to-Gold contracts,
+- `src/macro_data_ingest/load/*` for Postgres DDL, upserts, and serving views,
+- `config/datasets.yaml` and `.env.template` for operator configuration.
+
+## Plan of Work
+
+1. Generalize dataset specs from BEA-only to source-discriminated specs (`bea` + `census`).
+2. Add Census API client and ingest branch that writes Bronze payload/checkpoint/manifest with the same conventions.
+3. Add Census Silver transform and Census Gold projection for population rows.
+4. Extend Postgres DDL/upsert behavior with `gold.population_state_annual` and serving per-capita view.
+5. Add Census config/env/doc wiring and tests.
+6. Validate with lint/tests and a staging smoke `run-all` including the Census dataset.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi run-all --env staging --smoke --dataset-id census_state_population
+    .venv/bin/mdi run-all --env staging --smoke --dataset-id pce_state_sapce4
+
+Expected outcomes:
+- local tests pass with no BEA regressions;
+- Census smoke run succeeds (or reports external blocker with details);
+- BEA smoke rerun remains unchanged.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- mixed-source dataset config parsing works for `bea` and `census`;
+- Census Bronze/Silver/Gold artifacts are produced with stable schemas;
+- Postgres population table upsert is idempotent on rerun;
+- serving per-capita view returns joined population rows for BEA annual data;
+- docs reflect new environment/config and runbook behavior.
+
+## Idempotence and Recovery
+
+Idempotence:
+- Census ingest uses payload hash checkpoint to skip unchanged raw rewrites.
+- Census load upserts by deterministic primary keys `(state_fips, year)`.
+
+Recovery:
+- if Census API request fails, rerun ingest/load with the same dataset id;
+- if schema/view deploy fails mid-load, rerun `mdi load` for the dataset after fix.
+
+## Artifacts and Notes
+
+Planned artifacts:
+- `.agent/features/2026-03-06-census-state-population/SPEC.md`
+- `src/macro_data_ingest/datasets.py`
+- `src/macro_data_ingest/ingest/census_client.py`
+- `src/macro_data_ingest/ingest/pipeline.py`
+- `src/macro_data_ingest/transforms/census_silver.py`
+- `src/macro_data_ingest/transforms/census_gold.py`
+- `src/macro_data_ingest/transforms/pipeline.py`
+- `src/macro_data_ingest/load/pipeline.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `config/datasets.yaml`
+- `.env.template`
+- `README.md`, `docs/architecture.md`, `docs/operability.md`
+- tests under `tests/` for datasets, ingest, transform, and load routing
+
+## Interfaces and Dependencies
+
+Interfaces:
+- `CensusClient.fetch_state_population(years: list[int], variable: str) -> list[dict[str, Any]]`
+- source-routed stage functions in CLI/pipeline modules keyed by `dataset_spec.source`
+- new serving view `serving.v_pce_state_per_capita_annual`
+
+Dependencies:
+- Census Data API (`api.census.gov`)
+- existing AWS S3 + Postgres dependencies already in the project.
+
+---
+
+## Optional: Active ExecPlan Index
+
+- `2026-03-06 - Census State Population Source Integration - status: in progress - owner: codex agent`
