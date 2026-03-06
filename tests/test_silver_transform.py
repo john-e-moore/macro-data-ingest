@@ -236,3 +236,27 @@ def test_to_silver_frame_filters_to_requested_frequency() -> None:
     assert len(silver) == 1
     assert silver.iloc[0]["frequency"] == "M"
     assert silver.iloc[0]["period_code"] == "2024M02"
+
+
+def test_to_silver_frame_handles_missing_note_ref_column() -> None:
+    payload = {
+        "BEAAPI": {
+            "Results": {
+                "Data": [
+                    {
+                        "GeoFips": "01000",
+                        "GeoName": "Alabama",
+                        "TimePeriod": "2024",
+                        "Code": "SARPP-1",
+                        "FunctionName": "[SARPP] RPPs: All items",
+                        "DataValue": "100.0",
+                        "CL_UNIT": "Percent",
+                        "UNIT_MULT": "0",
+                    }
+                ]
+            }
+        }
+    }
+    silver = to_silver_frame(payload, bea_table_name="SARPP")
+    assert len(silver) == 1
+    assert silver.iloc[0]["note_ref"] == ""

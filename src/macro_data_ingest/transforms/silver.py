@@ -147,6 +147,8 @@ def to_silver_frame(
         frame["bea_table_name"] = frame["Code"].astype(str).str.split("-", n=1).str[0].str.upper()
     frame["value"] = pd.to_numeric(frame["DataValue"].astype(str).str.replace(",", ""), errors="coerce")
     frame["unit_mult"] = pd.to_numeric(frame["UNIT_MULT"], errors="coerce").fillna(0).astype(int)
+    if "NoteRef" not in frame.columns:
+        frame["NoteRef"] = ""
     if "FunctionName" not in frame.columns and "LineDescription" in frame.columns:
         frame["FunctionName"] = frame["LineDescription"]
     if "FunctionName" not in frame.columns:
