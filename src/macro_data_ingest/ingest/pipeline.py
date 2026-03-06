@@ -230,10 +230,11 @@ def _build_census_ingest_payload(
     rows: list[dict[str, Any]] = []
     dataset_path = dataset_spec.census_dataset_path.strip().lower()
     variable = dataset_spec.census_variable.strip().upper()
+    series_kind = dataset_spec.census_series_kind.strip().lower()
     acs_supported_years = [year for year in years if year >= 2005]
     pre_acs_years = [year for year in years if year < 2005]
 
-    if dataset_path == "acs/acs1":
+    if dataset_path == "acs/acs1" and series_kind == "population":
         if acs_supported_years:
             rows.extend(
                 client.fetch_state_population(
@@ -249,6 +250,15 @@ def _build_census_ingest_payload(
                     variable_alias=variable,
                 )
             )
+    elif dataset_path.startswith("timeseries/"):
+        rows.extend(
+            client.fetch_state_timeseries_metric(
+                years=years,
+                dataset_path=dataset_path,
+                value_column=variable,
+                predicates=dataset_spec.census_predicates,
+            )
+        )
     else:
         rows.extend(
             client.fetch_state_population(
@@ -285,7 +295,10 @@ def _build_census_ingest_payload(
         "variable": dataset_spec.census_variable,
         "geography": dataset_spec.census_geography,
         "year_range": requested_year_range,
+        "series_kind": dataset_spec.census_series_kind,
     }
+    if dataset_spec.census_predicates:
+        request_params["predicates"] = dict(sorted(dataset_spec.census_predicates.items()))
     return payload, rows, stable_records_hash(rows), request_params, None
 
 
@@ -380,6 +393,7 @@ def run_ingest(
     if isinstance(dataset_spec, CensusDatasetSpec):
         manifest["census_dataset_path"] = dataset_spec.census_dataset_path
         manifest["census_variable"] = dataset_spec.census_variable
+        manifest["census_series_kind"] = dataset_spec.census_series_kind
     manifest["checkpoint_uri"] = checkpoint_uri
     manifest["vintage"] = {
         "requested_year_range": str(request_params.get("year") or request_params.get("year_range") or ""),

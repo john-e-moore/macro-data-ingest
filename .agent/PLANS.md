@@ -1687,6 +1687,116 @@ Dependencies:
 
 ---
 
+# Federal Receipts Ratios Integration
+
+This ExecPlan is a living document and follows `.agent/PLANS.md`.
+
+Links: branch `feature/bea-sagdp-series`; feature brief `.agent/features/2026-03-06-federal-receipts-ratios/SPEC.md`; PR URL `(pending)`.
+
+## Purpose / Big Picture
+
+Add two explicit state-level federal-receipt channels and publish GDP-normalized serving outputs so
+operators can compare federal receipts intensity by state without mixing incompatible accounting
+channels in a single summed metric.
+
+## Progress
+
+- [x] (2026-03-06 00:00Z) Initial planning completed.
+- [ ] Implementation completed.
+- [ ] Validation and PR creation completed.
+
+## Surprises & Discoveries
+
+- Observation: Census Annual Survey of State Government Finances is exposed through `timeseries/govs`, not the ACS-style yearly endpoint contract used by existing Census population ingest.
+  Evidence: API metadata and sample queries require `time` predicate and survey filters (`SVY_COMP`, `GOVTYPE`, `AGG_DESC`).
+
+## Decision Log
+
+- Decision: implement Census state-government federal receipts through `timeseries/govs` with predicates `SVY_COMP=02`, `GOVTYPE=002`, `AGG_DESC=SF0004`.
+  Rationale: this is the official state-government finance slice in Census API with annual state coverage.
+  Date/Author: 2026-03-06, codex agent
+- Decision: publish separate ratio views for state-government and persons channels, each divided by `SAGDP1` line `3`.
+  Rationale: preserves interpretability and avoids false closure across accounting systems.
+  Date/Author: 2026-03-06, codex agent
+
+## Outcomes & Retrospective
+
+To be completed after runtime validation and PR creation.
+
+## Context and Orientation
+
+Relevant paths:
+- `src/macro_data_ingest/datasets.py` for source config parsing and Census spec fields,
+- `src/macro_data_ingest/ingest/*` for Census endpoint routing and Bronze manifests,
+- `src/macro_data_ingest/transforms/census_*` for Census silver/gold/conformed contracts,
+- `src/macro_data_ingest/load/*` for Postgres DDL/upserts and serving view refresh,
+- `config/datasets.yaml` for enabled dataset IDs and source predicates.
+
+## Plan of Work
+
+1. Extend Census dataset spec to support series kind, predicates, measure labels, and units.
+2. Add Census `timeseries/govs` ingest support for annual state government finance pulls.
+3. Add Census state-government finance silver/gold/conformed projections and dedicated compatibility table.
+4. Add BEA SAINC35 line-2000 dataset config for persons transfer receipts.
+5. Add serving views for `federal->state_gov / GDP` and `federal->persons / GDP`.
+6. Add/adjust tests and docs, then run lint/tests and staging `run-all` validations.
+
+## Concrete Steps
+
+    cd /home/john/tlg/macro-data-ingest
+    make lint test PYTHON=.venv/bin/python
+    .venv/bin/mdi run-all --env staging --run-id federal-receipts-20260306 --dataset-id state_personal_transfer_receipts_sainc35
+    .venv/bin/mdi run-all --env staging --run-id federal-receipts-20260306 --dataset-id census_state_gov_finance_federal_intergovernmental_revenue
+
+Expected outcomes:
+- tests/lint pass;
+- both dataset runs complete through load;
+- new serving ratio views are queryable with non-empty rows for available years.
+
+## Validation and Acceptance
+
+Acceptance checks:
+- new dataset IDs parse and run in source-specific stage routes,
+- `gold.state_gov_finance_annual` is populated idempotently,
+- `serving.v_state_federal_to_stategov_gdp_annual` and `serving.v_state_federal_to_persons_gdp_annual` exist,
+- rerun stability: no duplicate-key growth on immediate rerun.
+
+## Idempotence and Recovery
+
+Idempotence:
+- ingest hash checkpoints remain per-dataset and skip unchanged downstream work,
+- load uses deterministic conflict-key upserts for new and existing tables.
+
+Recovery:
+- rerun failed dataset IDs with new run IDs after transient API/network errors,
+- rollback by disabling new dataset entries and re-running load to refresh serving views.
+
+## Artifacts and Notes
+
+Expected artifacts:
+- `.agent/features/2026-03-06-federal-receipts-ratios/SPEC.md`
+- `config/datasets.yaml`, `config/datasets.example.yaml`
+- `src/macro_data_ingest/ingest/census_client.py`
+- `src/macro_data_ingest/ingest/pipeline.py`
+- `src/macro_data_ingest/transforms/census_silver.py`
+- `src/macro_data_ingest/transforms/census_gold.py`
+- `src/macro_data_ingest/load/postgres_loader.py`
+- `src/macro_data_ingest/load/pipeline.py`
+- tests and operator docs updated for new datasets/views
+
+## Interfaces and Dependencies
+
+Interfaces:
+- dataset IDs `state_personal_transfer_receipts_sainc35` and `census_state_gov_finance_federal_intergovernmental_revenue`
+- serving views `v_state_federal_to_stategov_gdp_annual` and `v_state_federal_to_persons_gdp_annual`
+
+Dependencies:
+- BEA `Regional` API (`SAINC35`, `SAGDP1`),
+- Census `timeseries/govs` API (`SVY_COMP=02`, `GOVTYPE=002`, `AGG_DESC=SF0004`),
+- existing S3 and Postgres runtime credentials.
+
+---
+
 # BEA SARPP and SARPI Series Integration
 
 This ExecPlan is a living document and follows `.agent/PLANS.md`.

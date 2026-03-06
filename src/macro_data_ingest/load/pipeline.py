@@ -16,7 +16,9 @@ from macro_data_ingest.datasets import BeaDatasetSpec, CensusDatasetSpec, Datase
 from macro_data_ingest.load.postgres_loader import PostgresLoader
 from macro_data_ingest.run_metadata import utc_now_iso
 from macro_data_ingest.transforms.census_gold import (
+    to_conformed_state_gov_finance_observation_frame,
     to_census_gold_frame,
+    to_census_state_gov_finance_gold_frame,
     to_conformed_population_observation_frame,
 )
 from macro_data_ingest.transforms.gold import to_conformed_observation_frame, to_gold_frame
@@ -129,16 +131,29 @@ def run_load(
             else ["bea_table_name", "state_fips", "year", "line_code"]
         )
     elif isinstance(dataset_spec, CensusDatasetSpec):
-        gold_frame = to_census_gold_frame(silver_frame)
-        if gold_frame.empty:
-            raise ValueError("Census Gold frame is empty; cannot load to Postgres.")
-        conformed_frame = to_conformed_population_observation_frame(
-            gold_frame,
-            source_name=dataset_spec.source,
-            dataset_id=dataset_spec.dataset_id,
-            vintage_tag=vintage_tag,
-        )
-        pk_cols = ["state_fips", "year", "census_variable"]
+        series_kind = dataset_spec.census_series_kind.strip().lower()
+        if series_kind == "state_gov_finance":
+            gold_frame = to_census_state_gov_finance_gold_frame(silver_frame)
+            if gold_frame.empty:
+                raise ValueError("Census state government finance Gold frame is empty; cannot load.")
+            conformed_frame = to_conformed_state_gov_finance_observation_frame(
+                gold_frame,
+                source_name=dataset_spec.source,
+                dataset_id=dataset_spec.dataset_id,
+                vintage_tag=vintage_tag,
+            )
+            pk_cols = ["state_fips", "year", "census_variable", "census_agg_desc"]
+        else:
+            gold_frame = to_census_gold_frame(silver_frame)
+            if gold_frame.empty:
+                raise ValueError("Census Gold frame is empty; cannot load to Postgres.")
+            conformed_frame = to_conformed_population_observation_frame(
+                gold_frame,
+                source_name=dataset_spec.source,
+                dataset_id=dataset_spec.dataset_id,
+                vintage_tag=vintage_tag,
+            )
+            pk_cols = ["state_fips", "year", "census_variable"]
     else:
         raise ValueError(f"Unsupported dataset source for load: {dataset_spec.source}")
     gold_frame["run_id"] = run_id
@@ -193,6 +208,8 @@ def run_load(
             "serving.v_macro_yoy",
             "serving.v_pce_state_yoy",
             "serving.v_pce_state_per_capita_annual",
+            "serving.v_state_federal_to_stategov_gdp_annual",
+            "serving.v_state_federal_to_persons_gdp_annual",
         ],
     }
     if isinstance(dataset_spec, BeaDatasetSpec):
@@ -200,6 +217,7 @@ def run_load(
     if isinstance(dataset_spec, CensusDatasetSpec):
         manifest["census_dataset_path"] = dataset_spec.census_dataset_path
         manifest["census_variable"] = dataset_spec.census_variable
+        manifest["census_series_kind"] = dataset_spec.census_series_kind
     manifest_key = (
         f"{config.s3_prefix_root}/gold/{source}/{dataset}/"
         f"extract_date={extract_date}/run_id={run_id}/manifest.json"

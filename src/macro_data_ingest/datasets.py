@@ -35,6 +35,10 @@ class CensusDatasetSpec(BaseDatasetSpec):
     census_geography: str
     census_start_year: int
     census_frequency: str
+    census_series_kind: str = "population"
+    census_predicates: dict[str, str] | None = None
+    census_measure_label: str = "Resident population"
+    census_unit: str = "persons"
 
 
 DatasetSpec = BeaDatasetSpec | CensusDatasetSpec
@@ -66,6 +70,15 @@ def _build_bea_spec(entry: dict[str, Any]) -> BeaDatasetSpec:
 
 
 def _build_census_spec(entry: dict[str, Any]) -> CensusDatasetSpec:
+    predicates_raw = entry.get("census_predicates")
+    predicates: dict[str, str] | None = None
+    if isinstance(predicates_raw, dict):
+        predicates = {
+            _require_text(key, "census_predicates key"): _require_text(
+                value, f"census_predicates[{key}]"
+            )
+            for key, value in predicates_raw.items()
+        }
     return CensusDatasetSpec(
         dataset_id=_require_text(entry.get("dataset_id"), "dataset_id"),
         source=_require_text(entry.get("source", "census"), "source"),
@@ -89,6 +102,12 @@ def _build_census_spec(entry: dict[str, Any]) -> CensusDatasetSpec:
         census_geography=_require_text(entry.get("census_geography", "state"), "census_geography"),
         census_start_year=int(entry.get("census_start_year", 2000)),
         census_frequency=_require_text(entry.get("census_frequency", "A"), "census_frequency"),
+        census_series_kind=_require_text(entry.get("census_series_kind", "population"), "census_series_kind"),
+        census_predicates=predicates,
+        census_measure_label=_require_text(
+            entry.get("census_measure_label", "Resident population"), "census_measure_label"
+        ),
+        census_unit=_require_text(entry.get("census_unit", "persons"), "census_unit"),
     )
 
 

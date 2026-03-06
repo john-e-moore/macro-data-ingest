@@ -57,3 +57,36 @@ def test_fetch_state_population_intercensal_maps_requested_years() -> None:
     assert rows[0]["state"] == "01"
     assert rows[0]["B01003_001E"] == "4452173"
     assert rows[0]["YEAR"] == "2000"
+
+
+def test_fetch_state_timeseries_metric_maps_rows() -> None:
+    class DummyClient(CensusClient):
+        def __init__(self) -> None:
+            super().__init__(api_key="x")
+
+        def _request(
+            self, year: int | None, dataset_path: str, params: dict[str, str]
+        ) -> list[list[str]]:
+            assert year is None
+            assert dataset_path == "timeseries/govs"
+            assert params["get"] == "NAME,AMOUNT"
+            assert params["time"] == "2023"
+            assert params["SVY_COMP"] == "02"
+            assert params["GOVTYPE"] == "002"
+            assert params["AGG_DESC"] == "SF0004"
+            return [
+                ["NAME", "AMOUNT", "time", "state"],
+                ["Alabama", "17107053", "2023", "01"],
+            ]
+
+    client = DummyClient()
+    rows = client.fetch_state_timeseries_metric(
+        years=[2023],
+        dataset_path="timeseries/govs",
+        value_column="AMOUNT",
+        predicates={"SVY_COMP": "02", "GOVTYPE": "002", "AGG_DESC": "SF0004"},
+    )
+    assert len(rows) == 1
+    assert rows[0]["NAME"] == "Alabama"
+    assert rows[0]["AMOUNT"] == "17107053"
+    assert rows[0]["YEAR"] == "2023"

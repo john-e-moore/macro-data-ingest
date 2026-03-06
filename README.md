@@ -3,6 +3,8 @@
 This repository contains a lightweight data engineering pipeline for **state-level macro data** with current sources:
 - **BEA Personal Consumption Expenditures (PCE) by State**
 - **US Census annual state population (ACS 1-year with pre-2005 intercensal backfill)**
+- **BEA SAINC35 annual transfer receipts to individuals from governments (line 2000)**
+- **US Census Annual Survey of State Government Finance federal intergovernmental revenue (SVY_COMP=02, GOVTYPE=002, AGG_DESC=SF0004)**
 
 The target architecture is:
 - **S3 Bronze** for immutable raw API payloads
@@ -72,6 +74,8 @@ The CLI exposes pipeline commands:
 - `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sasummary`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4_monthly`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_population`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id state_personal_transfer_receipts_sainc35`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_gov_finance_federal_intergovernmental_revenue`
 
 By default, ingest requests BEA annual years from `BEA_START_YEAR` through current year
 (set in `.env`, default `2000`). `run-all` skips transform/load automatically when the
@@ -85,13 +89,16 @@ ingest payload hash is unchanged.
 - `state_gdp_sagdp1` through `state_gdp_sagdp9` (annual SAGDP table group, `bea_frequency: A`)
 - `state_gdp_sagdp11` (annual SAGDP table group, `bea_frequency: A`)
 - `state_gdp_sasummary` (annual state GDP summary table, `bea_frequency: A`)
+- `state_personal_transfer_receipts_sainc35` (annual SAINC35 line 2000 transfer receipts to individuals from governments)
+- `census_state_gov_finance_federal_intergovernmental_revenue` (annual Census state government intergovernmental revenue, AGG_DESC `SF0004`)
 
 The repo also includes a staged monthly config entry:
 - `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)
 - `census_state_population` (annual Census population, `census_frequency: A`, `census_start_year: 2000`)
 
-Both annual datasets use `line_code: ALL`, so all function categories for each configured BEA table
-are ingested for the enabled grain.
+Most annual BEA datasets use `line_code: ALL`, so all function categories for each configured BEA table
+are ingested for the enabled grain; `state_personal_transfer_receipts_sainc35` is intentionally scoped to
+`line_code: 2000`.
 The monthly entry is disabled until BEA returns `TimePeriod` values at monthly grain for the requested table.
 
 These commands are implemented end-to-end for staging and can be used in GitHub Actions
@@ -122,6 +129,12 @@ Postgres uses a hybrid model:
 - `serving` exposes denormalized OBT-style views for common analyst/API access patterns.
 - Legacy `gold.pce_state_annual` and `serving.v_pce_state_yoy` remain for compatibility while
   consumers migrate to generalized serving contracts.
+- Fiscal-intensity views are available in:
+  - `serving.v_state_federal_to_stategov_gdp_annual`
+  - `serving.v_state_federal_to_persons_gdp_annual`
+
+Interpretation note:
+- `v_state_federal_to_persons_gdp_annual` uses BEA `SAINC35` line `2000` (transfer receipts of individuals from governments), which can include non-federal government components.
 
 ## Security Notes
 

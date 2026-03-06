@@ -79,8 +79,8 @@ Expected provisioning outputs:
 
 Postgres objects created/refreshed by load include:
 - Conformed `gold` model (`dim_source`, `dim_geo`, `dim_period`, `dim_series`, `dim_vintage`, `fact_macro_observation`)
-- Compatibility `gold.pce_state_annual`
-- Serving views (`serving.obt_state_macro_annual_latest`, `serving.v_macro_yoy`, `serving.v_pce_state_yoy`)
+- Compatibility `gold.pce_state_annual`, `gold.population_state_annual`, `gold.state_gov_finance_annual`
+- Serving views (`serving.obt_state_macro_annual_latest`, `serving.v_macro_yoy`, `serving.v_pce_state_yoy`, `serving.v_pce_state_per_capita_annual`, `serving.v_state_federal_to_stategov_gdp_annual`, `serving.v_state_federal_to_persons_gdp_annual`)
 
 Copy these outputs into:
 - local `.env`
@@ -115,7 +115,8 @@ Recommended optional secrets (override defaults when needed):
 `config/datasets.yaml` is the canonical source for daily runs. By default it includes
 annual BEA state tables `SAPCE1`, `SAPCE4`, `SARPP`, `SARPI`, `SAGDP1`-`SAGDP9`,
 `SAGDP11`, and `SASUMMARY` with `line_code: ALL` plus Census annual state population (`dataset_path: acs/acs1`, `variable: B01003_001E`,
-`start_year: 2000`; pre-2005 rows are backfilled from Census intercensal estimates).
+`start_year: 2000`; pre-2005 rows are backfilled from Census intercensal estimates), BEA annual `SAINC35` line `2000`,
+and Census annual state government finance intergovernmental revenue (`dataset_path: timeseries/govs`, `SVY_COMP=02`, `GOVTYPE=002`, `AGG_DESC=SF0004`).
 It also includes a disabled monthly SAPCE4 entry staged for future enablement once BEA
 returns monthly `TimePeriod` rows for the selected table. New series should default to
 `*_start_year: 2000` unless explicitly scoped tighter.

@@ -36,6 +36,10 @@ Initial scope:
   - Regional price parities by state (`SARPP`)
   - Real personal income and real PCE by state (`SARPI`)
   - State annual GDP table group (`SAGDP1`-`SAGDP9`, `SAGDP11`, `SASUMMARY`)
+  - Personal transfer receipts to individuals from governments (`SAINC35`, line `2000`)
+- Census state-level annual datasets, including:
+  - State resident population (`acs/acs1`, variable `B01003_001E`, with intercensal backfill for pre-2005)
+  - State government finance federal intergovernmental revenue (`timeseries/govs`, predicates `SVY_COMP=02`, `GOVTYPE=002`, `AGG_DESC=SF0004`)
 
 Config-driven dimensions:
 - frequency (annual and monthly supported)
@@ -44,4 +48,4 @@ Config-driven dimensions:
 - optional category allowlist
 - start year (`*_start_year`), with `2000` as the default baseline for new series
 
-Future sources (BLS, Census, IRS) are tracked separately and not part of MVP.
+Future sources (BLS, IRS) are tracked separately and not part of MVP.

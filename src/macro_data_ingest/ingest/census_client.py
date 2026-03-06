@@ -36,16 +36,24 @@ class CensusClient:
         if remaining > 0:
             time.sleep(remaining)
 
-    def _request(self, year: int, dataset_path: str, params: dict[str, str]) -> list[list[str]]:
+    def _request(
+        self, year: int | None, dataset_path: str, params: dict[str, str]
+    ) -> list[list[str]]:
         last_exception: Exception | None = None
         retryable_statuses = {429, 500, 502, 503, 504}
-        url = f"{self.base_url}/{year}/{dataset_path.strip('/')}"
+        normalized_path = dataset_path.strip("/")
+        if year is None:
+            url = f"{self.base_url}/{normalized_path}"
+        else:
+            url = f"{self.base_url}/{year}/{normalized_path}"
         for attempt in range(self.max_retries + 1):
             self._throttle_if_needed()
             self._last_request_monotonic = time.monotonic()
             try:
                 response = self._session.get(url, params=params, timeout=self.timeout_seconds)
                 response.raise_for_status()
+                if not response.text.strip():
+                    return []
                 payload = response.json()
                 if not isinstance(payload, list):
                     raise ValueError("Unexpected Census response format: expected list payload.")
@@ -110,6 +118,65 @@ class CensusClient:
                         variable_name: record[header_index[variable_name]],
                         "state": record[header_index["state"]],
                         "YEAR": str(year),
+                    }
+                )
+        return rows
+
+    def fetch_state_timeseries_metric(
+        self,
+        *,
+        years: list[int],
+        dataset_path: str,
+        value_column: str,
+        predicates: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        normalized_value_column = value_column.strip().upper()
+        extra_predicates = predicates or {}
+        for year in years:
+            params = {
+                "get": f"NAME,{normalized_value_column}",
+                "for": "state:*",
+                "time": str(year),
+                "key": self.api_key,
+            }
+            params.update(extra_predicates)
+            try:
+                payload = self._request(
+                    year=None,
+                    dataset_path=dataset_path,
+                    params=params,
+                )
+            except requests.HTTPError as exc:
+                status_code = exc.response.status_code if exc.response is not None else None
+                if status_code in {400, 404}:
+                    continue
+                raise
+            except ValueError:
+                # Some years can return non-JSON/empty payloads even with 200 responses.
+                continue
+            if len(payload) < 2:
+                continue
+            header = payload[0]
+            header_index = {name: idx for idx, name in enumerate(header)}
+            required = ["NAME", normalized_value_column, "state", "time"]
+            missing = [name for name in required if name not in header_index]
+            if missing:
+                raise ValueError(
+                    "Census timeseries response missing required columns "
+                    f"for year={year}: {missing}"
+                )
+            for record in payload[1:]:
+                time_value = str(record[header_index["time"]]).strip()
+                match = re.search(r"(\d{4})", time_value)
+                if match is None:
+                    continue
+                rows.append(
+                    {
+                        "NAME": record[header_index["NAME"]],
+                        normalized_value_column: record[header_index[normalized_value_column]],
+                        "state": record[header_index["state"]],
+                        "YEAR": match.group(1),
                     }
                 )
         return rows

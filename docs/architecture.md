@@ -59,10 +59,13 @@ Typical objects:
 - `gold.fact_macro_observation`
 - `gold.pce_state_annual` (compatibility table during migration)
 - `gold.population_state_annual` (Census population compatibility table)
+- `gold.state_gov_finance_annual` (Census state government finance compatibility table)
 - `serving.obt_state_macro_annual_latest`
 - `serving.v_macro_yoy`
 - `serving.v_pce_state_yoy` (compatibility projection)
 - `serving.v_pce_state_per_capita_annual`
+- `serving.v_state_federal_to_stategov_gdp_annual`
+- `serving.v_state_federal_to_persons_gdp_annual`
 
 ### Conformed Core Model
 
@@ -90,6 +93,8 @@ Use denormalized views for consumer ergonomics and performance:
 - `serving.v_macro_yoy`: generalized YoY derivation from OBT
 - `serving.v_pce_state_yoy`: BEA-compatible projection for existing consumers
 - `serving.v_pce_state_per_capita_annual`: BEA annual values joined to Census population denominator
+- `serving.v_state_federal_to_stategov_gdp_annual`: Census state-government federal receipts intensity versus nominal GDP
+- `serving.v_state_federal_to_persons_gdp_annual`: BEA transfer-receipts-to-persons intensity versus nominal GDP
 
 Design principle:
 - Keep reusable semantics in conformed `gold` objects.
@@ -129,5 +134,6 @@ Daily runs iterate all enabled datasets, so adding a BEA table, Census series, o
 grain is config-first. Current enabled annual datasets are `pce_state_sapce1`,
 `pce_state_sapce4`, `state_regional_price_parities_sarpp`,
 `state_real_income_and_pce_sarpi`, `state_gdp_sagdp1` through `state_gdp_sagdp9`,
-`state_gdp_sagdp11`, `state_gdp_sasummary`, and `census_state_population`; monthly SAPCE4
-remains staged as a disabled entry.
+`state_gdp_sagdp11`, `state_gdp_sasummary`, `state_personal_transfer_receipts_sainc35`,
+`census_state_population`, and `census_state_gov_finance_federal_intergovernmental_revenue`;
+monthly SAPCE4 remains staged as a disabled entry.
