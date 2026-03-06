@@ -1,6 +1,8 @@
 # Macro Data Ingest (BEA PCE by State)
 
-This repository contains a lightweight data engineering pipeline for **BEA Personal Consumption Expenditures (PCE) by State**.
+This repository contains a lightweight data engineering pipeline for **state-level macro data** with current sources:
+- **BEA Personal Consumption Expenditures (PCE) by State**
+- **US Census annual state population (ACS 1-year)**
 
 The target architecture is:
 - **S3 Bronze** for immutable raw API payloads
@@ -56,6 +58,7 @@ The CLI exposes pipeline commands:
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce1`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4`
 - `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4_monthly`
+- `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_population`
 
 By default, ingest requests BEA annual years from `BEA_START_YEAR` through current year
 (set in `.env`, default `2000`). `run-all` skips transform/load automatically when the
@@ -67,6 +70,7 @@ ingest payload hash is unchanged.
 
 The repo also includes a staged monthly config entry:
 - `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)
+- `census_state_population` (annual Census PEP population, `census_frequency: A`)
 
 Both annual datasets use `line_code: ALL`, so all function categories for each configured BEA table
 are ingested for the enabled grain.

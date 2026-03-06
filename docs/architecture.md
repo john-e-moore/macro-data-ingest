@@ -3,7 +3,7 @@
 ## Overview
 
 The pipeline follows a lightweight lakehouse pattern:
-- **Bronze**: immutable raw BEA API payloads
+- **Bronze**: immutable raw source API payloads (BEA + Census)
 - **Silver**: cleaned, typed, normalized records
 - **Gold**: analytics-ready modeled outputs
 - **Postgres**: curated serving tables and derived views
@@ -58,9 +58,11 @@ Typical objects:
 - `gold.dim_vintage`
 - `gold.fact_macro_observation`
 - `gold.pce_state_annual` (compatibility table during migration)
+- `gold.population_state_annual` (Census population compatibility table)
 - `serving.obt_state_macro_annual_latest`
 - `serving.v_macro_yoy`
 - `serving.v_pce_state_yoy` (compatibility projection)
+- `serving.v_pce_state_per_capita_annual`
 
 ### Conformed Core Model
 
@@ -87,6 +89,7 @@ Use denormalized views for consumer ergonomics and performance:
 - `serving.obt_state_macro_annual_latest`: one wide annual row at latest vintage
 - `serving.v_macro_yoy`: generalized YoY derivation from OBT
 - `serving.v_pce_state_yoy`: BEA-compatible projection for existing consumers
+- `serving.v_pce_state_per_capita_annual`: BEA annual values joined to Census population denominator
 
 Design principle:
 - Keep reusable semantics in conformed `gold` objects.
@@ -118,11 +121,10 @@ Lineage is written to both S3 manifests and Postgres metadata tables.
 ## Multi-table Daily Ingest
 
 Dataset definitions are kept in `config/datasets.yaml`. Each enabled entry controls:
-- BEA table (`bea_table_name`)
-- query shape (`line_code`, `geo_fips`, `bea_frequency`, start year)
+- source-specific request shape (`bea_*` or `census_*`)
 - storage identity (`dataset_id`)
 - Postgres target table
 
-Daily runs iterate all enabled datasets, so adding a BEA table or a new time grain is config-first.
-Current enabled annual datasets are `pce_state_sapce1` and `pce_state_sapce4`; monthly SAPCE4
-remains staged as a disabled entry.
+Daily runs iterate all enabled datasets, so adding a BEA table, Census series, or a new time
+grain is config-first. Current enabled annual datasets are `pce_state_sapce1`,
+`pce_state_sapce4`, and `census_state_population`; monthly SAPCE4 remains staged as a disabled entry.

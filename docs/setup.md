@@ -42,6 +42,7 @@ Do not commit real values.
 - `S3_LOG_BUCKET=tlg-macro-data-access-logs`
 - `GITHUB_REPO=your-org/macro-data-ingest`
 - `BEA_API_KEY=example`
+- `CENSUS_API_KEY=example`
 - `BEA_DATASET=Regional`
 - `BEA_TABLE_NAME=SAPCE4`
 - `BEA_FREQUENCY=A`
@@ -94,6 +95,7 @@ Set repository-level secrets:
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 - `BEA_API_KEY`
+- `CENSUS_API_KEY`
 - `PG_HOST`
 - `PG_PORT`
 - `PG_DATABASE`
@@ -111,9 +113,10 @@ Recommended optional secrets (override defaults when needed):
 - `BEA_START_YEAR` (default `2000`; ingestion requests this year through current year)
 
 `config/datasets.yaml` is the canonical source for daily runs. By default it includes
-annual `SAPCE4` with `line_code: ALL`, so all SAPCE4 functions are ingested on each run.
-It also includes a disabled monthly SAPCE4 entry staged for future enablement once BEA
-returns monthly `TimePeriod` rows for the selected table.
+annual `SAPCE1`/`SAPCE4` with `line_code: ALL` and Census annual state population
+(`dataset_path: acs/acs1`, `variable: B01003_001E`). It also includes a disabled monthly
+SAPCE4 entry staged for future enablement once BEA returns monthly `TimePeriod` rows
+for the selected table.
 
 ## Standardized Backfills
 
