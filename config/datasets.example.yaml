@@ -174,3 +174,31 @@ datasets:
     census_frequency: A
     target_table: population_state_annual
     enabled: true
+  - dataset_id: state_personal_transfer_receipts_sainc35
+    source: bea
+    storage_dataset: pce_state
+    bea_dataset: Regional
+    bea_table_name: SAINC35
+    bea_frequency: A
+    bea_start_year: 2000
+    line_code: "2000"
+    geo_fips: STATE
+    target_table: pce_state_annual
+    enabled: true
+  - dataset_id: census_state_gov_finance_federal_intergovernmental_revenue
+    source: census
+    storage_dataset: state_gov_finance
+    census_dataset_path: timeseries/govs
+    census_variable: AMOUNT
+    census_geography: state
+    census_start_year: 2012
+    census_frequency: A
+    census_series_kind: state_gov_finance
+    census_measure_label: Federal intergovernmental revenue
+    census_unit: dollars_thousands
+    census_predicates:
+      SVY_COMP: "02"
+      GOVTYPE: "002"
+      AGG_DESC: SF0004
+    target_table: state_gov_finance_annual
+    enabled: true

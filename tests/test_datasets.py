@@ -72,6 +72,48 @@ def test_load_dataset_specs_supports_census_source(
     assert specs[0].census_dataset_path == "acs/acs1"
 
 
+def test_load_dataset_specs_supports_census_state_gov_finance_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config_path = tmp_path / "datasets.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "datasets:",
+                "  - dataset_id: census_state_gov_finance_federal_intergovernmental_revenue",
+                "    source: census",
+                "    storage_dataset: state_gov_finance",
+                "    census_dataset_path: timeseries/govs",
+                "    census_variable: AMOUNT",
+                "    census_geography: state",
+                "    census_start_year: 2012",
+                "    census_frequency: A",
+                "    census_series_kind: state_gov_finance",
+                "    census_measure_label: Federal intergovernmental revenue",
+                "    census_unit: dollars_thousands",
+                "    census_predicates:",
+                "      SVY_COMP: '02'",
+                "      GOVTYPE: '002'",
+                "      AGG_DESC: SF0004",
+                "    target_table: state_gov_finance_annual",
+                "    enabled: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("DATASETS_CONFIG_PATH", str(config_path))
+    cfg = load_config()
+    specs = load_dataset_specs(cfg)
+    assert len(specs) == 1
+    assert isinstance(specs[0], CensusDatasetSpec)
+    assert specs[0].census_series_kind == "state_gov_finance"
+    assert specs[0].census_predicates == {
+        "SVY_COMP": "02",
+        "GOVTYPE": "002",
+        "AGG_DESC": "SF0004",
+    }
+
+
 def test_load_dataset_specs_supports_sarpp_and_sarpi_tables(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

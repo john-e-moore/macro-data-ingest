@@ -181,3 +181,56 @@ def test_build_census_ingest_payload_backfills_pre_2005_for_acs(monkeypatch: pyt
     assert rows[0]["YEAR"] == "2000"
     assert rows[1]["YEAR"] == "2005"
     assert request_params["dataset_path"] == "acs/acs1"
+
+
+def test_build_census_ingest_payload_supports_timeseries_govs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DummyConfig:
+        census_api_key = "x"
+
+    spec = CensusDatasetSpec(
+        dataset_id="census_state_gov_finance_federal_intergovernmental_revenue",
+        source="census",
+        storage_dataset="state_gov_finance",
+        target_table="state_gov_finance_annual",
+        enabled=True,
+        census_dataset_path="timeseries/govs",
+        census_variable="AMOUNT",
+        census_geography="state",
+        census_start_year=2012,
+        census_frequency="A",
+        census_series_kind="state_gov_finance",
+        census_predicates={"SVY_COMP": "02", "GOVTYPE": "002", "AGG_DESC": "SF0004"},
+        census_measure_label="Federal intergovernmental revenue",
+        census_unit="dollars_thousands",
+    )
+
+    class DummyCensusClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "x"
+
+        @staticmethod
+        def fetch_state_timeseries_metric(
+            *,
+            years: list[int],
+            dataset_path: str,
+            value_column: str,
+            predicates: dict[str, str] | None,
+        ) -> list[dict]:
+            assert years[0] == 2012
+            assert dataset_path == "timeseries/govs"
+            assert value_column == "AMOUNT"
+            assert predicates == {"SVY_COMP": "02", "GOVTYPE": "002", "AGG_DESC": "SF0004"}
+            return [{"NAME": "Alabama", "AMOUNT": "17107053", "state": "01", "YEAR": "2023"}]
+
+    monkeypatch.setattr("macro_data_ingest.ingest.pipeline.CensusClient", DummyCensusClient)
+    _, rows, _, request_params, _ = _build_census_ingest_payload(
+        config=DummyConfig(),
+        dataset_spec=spec,
+        smoke=False,
+    )
+    assert len(rows) == 1
+    assert rows[0]["AMOUNT"] == "17107053"
+    assert request_params["dataset_path"] == "timeseries/govs"
+    assert request_params["series_kind"] == "state_gov_finance"

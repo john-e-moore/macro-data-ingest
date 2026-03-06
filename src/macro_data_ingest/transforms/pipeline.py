@@ -146,6 +146,7 @@ def run_transform(
     if isinstance(dataset_spec, CensusDatasetSpec):
         manifest["census_dataset_path"] = dataset_spec.census_dataset_path
         manifest["census_variable"] = dataset_spec.census_variable
+        manifest["census_series_kind"] = dataset_spec.census_series_kind
     manifest_key = (
         f"{config.s3_prefix_root}/silver/{source}/{dataset}/"
         f"extract_date={extract_date}/run_id={run_id}/manifest.json"

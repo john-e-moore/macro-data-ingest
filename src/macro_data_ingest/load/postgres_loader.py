@@ -113,6 +113,26 @@ class PostgresLoader:
             PRIMARY KEY (state_fips, year, census_variable)
         );
 
+        CREATE TABLE IF NOT EXISTS {schema_gold}.state_gov_finance_annual (
+            state_fips TEXT NOT NULL,
+            state_abbrev TEXT NOT NULL,
+            geo_name TEXT NOT NULL,
+            frequency TEXT NOT NULL,
+            period_code TEXT NOT NULL,
+            year INTEGER NOT NULL,
+            amount DOUBLE PRECISION NOT NULL,
+            census_dataset_path TEXT NOT NULL,
+            census_variable TEXT NOT NULL,
+            census_series_kind TEXT NOT NULL,
+            census_measure_label TEXT NOT NULL,
+            census_agg_desc TEXT NOT NULL,
+            unit TEXT NOT NULL,
+            note_ref TEXT NULL,
+            run_id TEXT NOT NULL,
+            loaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (state_fips, year, census_variable, census_agg_desc)
+        );
+
         CREATE TABLE IF NOT EXISTS {schema_gold}.dim_source (
             source_id BIGSERIAL PRIMARY KEY,
             source_name TEXT NOT NULL,
@@ -890,6 +910,8 @@ class PostgresLoader:
         view_sql = f"""
         DROP VIEW IF EXISTS {schema_serving}.v_pce_state_yoy;
         DROP VIEW IF EXISTS {schema_serving}.v_pce_state_per_capita_annual;
+        DROP VIEW IF EXISTS {schema_serving}.v_state_federal_to_stategov_gdp_annual;
+        DROP VIEW IF EXISTS {schema_serving}.v_state_federal_to_persons_gdp_annual;
         DROP VIEW IF EXISTS {schema_serving}.v_macro_yoy;
         DROP VIEW IF EXISTS {schema_serving}.obt_state_macro_annual_latest;
 
@@ -1010,6 +1032,95 @@ class PostgresLoader:
         LEFT JOIN population_rows p
             ON b.state_fips = p.state_fips
            AND b.year = p.year;
+
+        CREATE VIEW {schema_serving}.v_state_federal_to_stategov_gdp_annual AS
+        WITH gdp_rows AS (
+            SELECT
+                state_fips,
+                state_abbrev,
+                geo_name,
+                year,
+                pce_value_scaled AS gdp_current_dollars,
+                vintage_tag AS gdp_vintage_tag
+            FROM {schema_serving}.obt_state_macro_annual_latest
+            WHERE source_name = 'BEA'
+              AND bea_table_name = 'SAGDP1'
+              AND line_code = '3'
+        ),
+        federal_stategov_rows AS (
+            SELECT
+                state_fips,
+                state_abbrev,
+                geo_name,
+                year,
+                pce_value_scaled AS federal_stategov_receipts_dollars,
+                vintage_tag AS federal_stategov_vintage_tag
+            FROM {schema_serving}.obt_state_macro_annual_latest
+            WHERE source_name = 'CENSUS'
+              AND dataset_id = 'census_state_gov_finance_federal_intergovernmental_revenue'
+        )
+        SELECT
+            n.state_fips,
+            n.state_abbrev,
+            n.geo_name,
+            n.year,
+            n.federal_stategov_receipts_dollars,
+            d.gdp_current_dollars,
+            CASE
+                WHEN d.gdp_current_dollars IS NULL OR d.gdp_current_dollars = 0 THEN NULL
+                ELSE n.federal_stategov_receipts_dollars / d.gdp_current_dollars
+            END AS federal_stategov_to_gdp_ratio,
+            n.federal_stategov_vintage_tag,
+            d.gdp_vintage_tag
+        FROM federal_stategov_rows n
+        LEFT JOIN gdp_rows d
+            ON n.state_fips = d.state_fips
+           AND n.year = d.year;
+
+        CREATE VIEW {schema_serving}.v_state_federal_to_persons_gdp_annual AS
+        WITH gdp_rows AS (
+            SELECT
+                state_fips,
+                state_abbrev,
+                geo_name,
+                year,
+                pce_value_scaled AS gdp_current_dollars,
+                vintage_tag AS gdp_vintage_tag
+            FROM {schema_serving}.obt_state_macro_annual_latest
+            WHERE source_name = 'BEA'
+              AND bea_table_name = 'SAGDP1'
+              AND line_code = '3'
+        ),
+        federal_persons_rows AS (
+            SELECT
+                state_fips,
+                state_abbrev,
+                geo_name,
+                year,
+                pce_value_scaled AS federal_to_persons_receipts_dollars,
+                vintage_tag AS federal_to_persons_vintage_tag
+            FROM {schema_serving}.obt_state_macro_annual_latest
+            WHERE source_name = 'BEA'
+              AND dataset_id = 'state_personal_transfer_receipts_sainc35'
+              AND line_code = '2000'
+        )
+        SELECT
+            n.state_fips,
+            n.state_abbrev,
+            n.geo_name,
+            n.year,
+            n.federal_to_persons_receipts_dollars,
+            d.gdp_current_dollars,
+            CASE
+                WHEN d.gdp_current_dollars IS NULL OR d.gdp_current_dollars = 0 THEN NULL
+                ELSE n.federal_to_persons_receipts_dollars / d.gdp_current_dollars
+            END AS federal_to_persons_to_gdp_ratio,
+            n.federal_to_persons_vintage_tag,
+            d.gdp_vintage_tag
+        FROM federal_persons_rows n
+        LEFT JOIN gdp_rows d
+            ON n.state_fips = d.state_fips
+           AND n.year = d.year;
         """
         with self.engine.begin() as conn:
             conn.execute(text(view_sql))

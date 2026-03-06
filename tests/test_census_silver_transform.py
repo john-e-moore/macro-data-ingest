@@ -23,6 +23,25 @@ def _spec() -> CensusDatasetSpec:
     )
 
 
+def _state_gov_finance_spec() -> CensusDatasetSpec:
+    return CensusDatasetSpec(
+        dataset_id="census_state_gov_finance_federal_intergovernmental_revenue",
+        source="census",
+        storage_dataset="state_gov_finance",
+        target_table="state_gov_finance_annual",
+        enabled=True,
+        census_dataset_path="timeseries/govs",
+        census_variable="AMOUNT",
+        census_geography="state",
+        census_start_year=2012,
+        census_frequency="A",
+        census_series_kind="state_gov_finance",
+        census_predicates={"SVY_COMP": "02", "GOVTYPE": "002", "AGG_DESC": "SF0004"},
+        census_measure_label="Federal intergovernmental revenue",
+        census_unit="dollars_thousands",
+    )
+
+
 def test_to_census_silver_frame_maps_columns() -> None:
     payload = {
         "CENSUSAPI": {
@@ -56,6 +75,7 @@ def test_validate_census_silver_frame_rejects_duplicates() -> None:
                 "population": 1.0,
                 "census_dataset_path": "acs/acs1",
                 "census_variable": "B01003_001E",
+                "census_series_kind": "population",
                 "unit": "persons",
                 "note_ref": "",
             },
@@ -69,6 +89,7 @@ def test_validate_census_silver_frame_rejects_duplicates() -> None:
                 "population": 2.0,
                 "census_dataset_path": "acs/acs1",
                 "census_variable": "B01003_001E",
+                "census_series_kind": "population",
                 "unit": "persons",
                 "note_ref": "",
             },
@@ -76,3 +97,20 @@ def test_validate_census_silver_frame_rejects_duplicates() -> None:
     )
     with pytest.raises(ValueError):
         validate_census_silver_frame(frame)
+
+
+def test_to_census_silver_frame_maps_state_gov_finance_rows() -> None:
+    payload = {
+        "CENSUSAPI": {
+            "Results": {
+                "Data": [
+                    {"NAME": "Alabama", "AMOUNT": "17107053", "state": "01", "YEAR": "2023"},
+                ]
+            }
+        }
+    }
+    silver = to_census_silver_frame(payload, _state_gov_finance_spec())
+    assert len(silver) == 1
+    assert silver.iloc[0]["amount"] == 17107053
+    assert silver.iloc[0]["census_series_kind"] == "state_gov_finance"
+    assert silver.iloc[0]["census_agg_desc"] == "SF0004"
