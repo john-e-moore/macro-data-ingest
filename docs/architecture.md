@@ -131,3 +131,5 @@ grain is config-first. Current enabled annual datasets are `pce_state_sapce1`,
 `state_gdp_sagdp11`, `state_gdp_sasummary`, `state_personal_transfer_receipts_sainc35`,
 `census_state_population`, and `census_state_gov_finance_federal_intergovernmental_revenue`;
 monthly SAPCE4 remains staged as a disabled entry.
+
+For the canonical dataset catalog and per-dataset semantics, see `docs/datasets.md`.

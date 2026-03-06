@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import time
 from typing import Any
 
-import requests
+from macro_data_ingest.ingest.http_utils import JsonHttpClient
 
 
 @dataclass(frozen=True)
@@ -31,57 +30,22 @@ class BeaClient:
         min_request_interval_seconds: float = 0.25,
     ) -> None:
         self.api_key = api_key
-        self.timeout_seconds = timeout_seconds
-        self.max_retries = max_retries
-        self.retry_backoff_seconds = retry_backoff_seconds
-        self.min_request_interval_seconds = min_request_interval_seconds
-        self._session = requests.Session()
-        self._last_request_monotonic: float | None = None
-
-    def _throttle_if_needed(self) -> None:
-        if self._last_request_monotonic is None:
-            return
-        elapsed = time.monotonic() - self._last_request_monotonic
-        remaining = self.min_request_interval_seconds - elapsed
-        if remaining > 0:
-            time.sleep(remaining)
+        self._http = JsonHttpClient(
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            retry_backoff_seconds=retry_backoff_seconds,
+            min_request_interval_seconds=min_request_interval_seconds,
+        )
 
     def _request(self, params: dict[str, str]) -> dict[str, Any]:
-        last_exception: Exception | None = None
-        retryable_statuses = {429, 500, 502, 503, 504}
-        for attempt in range(self.max_retries + 1):
-            self._throttle_if_needed()
-            self._last_request_monotonic = time.monotonic()
-            try:
-                response = self._session.get(
-                    self.base_url,
-                    params=params,
-                    timeout=self.timeout_seconds,
-                )
-                response.raise_for_status()
-                return response.json()
-            except requests.HTTPError as exc:
-                last_exception = exc
-                status_code = exc.response.status_code if exc.response is not None else None
-                if status_code not in retryable_statuses or attempt == self.max_retries:
-                    raise
-                retry_after = None
-                if exc.response is not None:
-                    retry_after = exc.response.headers.get("Retry-After")
-                if retry_after:
-                    wait_seconds = float(retry_after)
-                else:
-                    wait_seconds = self.retry_backoff_seconds * (2**attempt)
-                time.sleep(wait_seconds)
-            except requests.RequestException as exc:
-                last_exception = exc
-                if attempt == self.max_retries:
-                    raise
-                wait_seconds = self.retry_backoff_seconds * (2**attempt)
-                time.sleep(wait_seconds)
-        if last_exception is not None:
-            raise last_exception
-        raise RuntimeError("Unexpected request retry failure without exception.")
+        payload = self._http.request_json(
+            url=self.base_url,
+            params=params,
+            honor_retry_after_header=True,
+        )
+        if not isinstance(payload, dict):
+            raise ValueError("Unexpected BEA response format: expected object payload.")
+        return payload
 
     def _build_params(self, query: BeaQuery) -> dict[str, str]:
         params = {

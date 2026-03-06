@@ -1,4 +1,4 @@
-name: Daily BEA Ingest
+name: Daily Macro Ingest
 
 on:
   schedule:
@@ -66,9 +66,9 @@ jobs:
       - name: Execute pipeline
         run: |
           if [ "${{ github.event.inputs.smoke }}" = "true" ]; then
-            mdi run-all --env "$APP_ENV" --run-id "$RUN_ID" --smoke 2>&1 | tee logs/pipeline.log
+            mdi run-all --run-id "$RUN_ID" --smoke 2>&1 | tee logs/pipeline.log
           else
-            mdi run-all --env "$APP_ENV" --run-id "$RUN_ID" 2>&1 | tee logs/pipeline.log
+            mdi run-all --run-id "$RUN_ID" 2>&1 | tee logs/pipeline.log
           fi
           cat <<EOF > manifests/run_context.json
           {

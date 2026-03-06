@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import logging
 import uuid
+from collections.abc import Callable
+from typing import Any
 
 from macro_data_ingest.config import load_config
 from macro_data_ingest.datasets import DatasetSpec, load_dataset_specs
@@ -16,7 +18,6 @@ LOGGER = logging.getLogger(__name__)
 
 def _base_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="mdi", description="Macro Data Ingest CLI", add_help=False)
-    parser.add_argument("--env", default="staging", choices=["staging", "prod"])
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--smoke", action="store_true", help="Use tiny pull and reduced workload.")
     parser.add_argument(
@@ -56,91 +57,98 @@ def _run_ingest_stage(
     return run_ingest(config=config, run_id=run_id, dataset_spec=dataset_spec, smoke=args.smoke)
 
 
-def cmd_ingest(args: argparse.Namespace) -> int:
+def _resolve_context(args: argparse.Namespace, stage: str) -> tuple[Any, str, list[DatasetSpec]] | None:
     config = load_config()
     base_run_id = _resolve_run_id(args.run_id)
     try:
         specs = _resolve_specs(args)
     except Exception:
-        LOGGER.exception("failed to resolve datasets", extra={"run_id": base_run_id, "stage": "ingest"})
+        LOGGER.exception("failed to resolve datasets", extra={"run_id": base_run_id, "stage": stage})
+        return None
+    return config, base_run_id, specs
+
+
+def _run_dataset_stage(
+    *,
+    args: argparse.Namespace,
+    stage: str,
+    runner: Callable[[Any, DatasetSpec, str, bool], Any],
+    printer: Callable[[DatasetSpec, Any], str],
+) -> int:
+    context = _resolve_context(args, stage=stage)
+    if context is None:
         return 1
+    config, base_run_id, specs = context
     for spec in specs:
         dataset_run_id = _dataset_run_id(base_run_id, spec.dataset_id)
         try:
-            result = _run_ingest_stage(args, config=config, dataset_spec=spec, run_id=dataset_run_id)
+            result = runner(config, spec, dataset_run_id, args.smoke)
         except Exception:
-            LOGGER.exception("ingest failed", extra={"run_id": dataset_run_id, "stage": "ingest"})
+            LOGGER.exception(f"{stage} failed", extra={"run_id": dataset_run_id, "stage": stage})
             return 1
-        print(
+        print(printer(spec, result))
+    return 0
+
+
+def cmd_ingest(args: argparse.Namespace) -> int:
+    return _run_dataset_stage(
+        args=args,
+        stage="ingest",
+        runner=lambda config, spec, run_id, smoke: run_ingest(
+            config=config,
+            run_id=run_id,
+            dataset_spec=spec,
+            smoke=smoke,
+        ),
+        printer=lambda spec, result: (
             "ingest completed "
             f"dataset_id={spec.dataset_id} run_id={result.run_id} changed={result.changed} "
             f"rows={result.row_count} manifest={result.manifest_uri}"
-        )
-    return 0
+        ),
+    )
 
 
 def cmd_transform(args: argparse.Namespace) -> int:
-    config = load_config()
-    base_run_id = _resolve_run_id(args.run_id)
-    try:
-        specs = _resolve_specs(args)
-    except Exception:
-        LOGGER.exception(
-            "failed to resolve datasets", extra={"run_id": base_run_id, "stage": "transform"}
-        )
-        return 1
-    for spec in specs:
-        dataset_run_id = _dataset_run_id(base_run_id, spec.dataset_id)
-        try:
-            result = run_transform(
-                config=config, run_id=dataset_run_id, dataset_spec=spec, smoke=args.smoke
-            )
-        except Exception:
-            LOGGER.exception("transform failed", extra={"run_id": dataset_run_id, "stage": "transform"})
-            return 1
-
-        print(
+    return _run_dataset_stage(
+        args=args,
+        stage="transform",
+        runner=lambda config, spec, run_id, smoke: run_transform(
+            config=config,
+            run_id=run_id,
+            dataset_spec=spec,
+            smoke=smoke,
+        ),
+        printer=lambda spec, result: (
             "transform completed "
             f"dataset_id={spec.dataset_id} run_id={result.run_id} rows={result.row_count} "
             f"silver={result.silver_uri} manifest={result.manifest_uri}"
-        )
-    return 0
+        ),
+    )
 
 
 def cmd_load(args: argparse.Namespace) -> int:
-    config = load_config()
-    base_run_id = _resolve_run_id(args.run_id)
-    try:
-        specs = _resolve_specs(args)
-    except Exception:
-        LOGGER.exception("failed to resolve datasets", extra={"run_id": base_run_id, "stage": "load"})
-        return 1
-    for spec in specs:
-        dataset_run_id = _dataset_run_id(base_run_id, spec.dataset_id)
-        try:
-            result = run_load(config=config, run_id=dataset_run_id, dataset_spec=spec, smoke=args.smoke)
-        except Exception:
-            LOGGER.exception("load failed", extra={"run_id": dataset_run_id, "stage": "load"})
-            return 1
-
-        print(
+    return _run_dataset_stage(
+        args=args,
+        stage="load",
+        runner=lambda config, spec, run_id, smoke: run_load(
+            config=config,
+            run_id=run_id,
+            dataset_spec=spec,
+            smoke=smoke,
+        ),
+        printer=lambda spec, result: (
             "load completed "
             f"dataset_id={spec.dataset_id} run_id={result.run_id} rows={result.row_count} "
             f"table={result.conformed_table} manifest={result.manifest_uri}"
-        )
-    return 0
+        ),
+    )
 
 
 def cmd_run_all(args: argparse.Namespace) -> int:
-    config = load_config()
-    base_run_id = _resolve_run_id(args.run_id)
-    try:
-        specs = _resolve_specs(args)
-    except Exception:
-        LOGGER.exception(
-            "failed to resolve datasets", extra={"run_id": base_run_id, "stage": "run-all"}
-        )
+    context = _resolve_context(args, stage="run-all")
+    if context is None:
         return 1
+    config, base_run_id, specs = context
 
     for spec in specs:
         dataset_run_id = _dataset_run_id(base_run_id, spec.dataset_id)

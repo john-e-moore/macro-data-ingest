@@ -44,5 +44,5 @@ def test_run_all_skips_downstream_when_unchanged(monkeypatch) -> None:  # noqa: 
     monkeypatch.setattr(cli, "run_transform", fail_transform)
     monkeypatch.setattr(cli, "run_load", fail_load)
 
-    args = Namespace(run_id="run-1", smoke=False, env="staging", dataset_id=None)
+    args = Namespace(run_id="run-1", smoke=False, dataset_id=None)
     assert cli.cmd_run_all(args) == 0

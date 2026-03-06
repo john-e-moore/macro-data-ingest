@@ -48,4 +48,7 @@ Config-driven dimensions:
 - optional category allowlist
 - start year (`*_start_year`), with `2000` as the default baseline for new series
 
+Canonical dataset definitions are maintained in `config/datasets.yaml` and summarized in
+`docs/datasets.md`.
+
 Future sources (BLS, IRS) are tracked separately and not part of MVP.

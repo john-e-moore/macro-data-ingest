@@ -31,15 +31,15 @@ Supported backfill type:
 Use the same CLI stages as daily runs. For most cases, run all stages together:
 
 ```bash
-mdi run-all --env staging --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
+mdi run-all --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
 ```
 
 For controlled reruns, execute stages separately:
 
 ```bash
-mdi ingest --env staging --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
-mdi transform --env staging --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
-mdi load --env staging --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
+mdi ingest --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
+mdi transform --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
+mdi load --run-id backfill-<dataset>-<yyyymmdd> --dataset-id <dataset_id>
 ```
 
 ## Validation Queries

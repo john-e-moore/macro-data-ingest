@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 @dataclass(frozen=True)
 class AppConfig:
-    app_env: str
     log_level: str
     aws_region: str
     aws_account_id: str
@@ -21,10 +20,6 @@ class AppConfig:
     github_repo: str
     bea_api_key: str
     census_api_key: str
-    bea_dataset: str
-    bea_table_name: str
-    bea_frequency: str
-    bea_start_year: int
     datasets_config_path: str
     pg_host: str
     pg_port: int
@@ -42,7 +37,6 @@ def load_config() -> AppConfig:
     load_dotenv()
 
     return AppConfig(
-        app_env=os.getenv("APP_ENV", "staging"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         aws_region=os.getenv("AWS_REGION", "us-east-1"),
         aws_account_id=os.getenv("AWS_ACCOUNT_ID", ""),
@@ -55,10 +49,6 @@ def load_config() -> AppConfig:
         github_repo=os.getenv("GITHUB_REPO", ""),
         bea_api_key=os.getenv("BEA_API_KEY", ""),
         census_api_key=os.getenv("CENSUS_API_KEY", ""),
-        bea_dataset=os.getenv("BEA_DATASET", "Regional"),
-        bea_table_name=os.getenv("BEA_TABLE_NAME", "SAPCE4"),
-        bea_frequency=os.getenv("BEA_FREQUENCY", "A"),
-        bea_start_year=int(os.getenv("BEA_START_YEAR", "2000")),
         datasets_config_path=os.getenv("DATASETS_CONFIG_PATH", "config/datasets.yaml"),
         pg_host=os.getenv("PG_HOST", ""),
         pg_port=int(os.getenv("PG_PORT", "5432")),

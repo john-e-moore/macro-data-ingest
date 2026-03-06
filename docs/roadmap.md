@@ -22,7 +22,7 @@
 
 ## v2
 
-- Additional macro sources (Census, BLS, IRS)
+- Additional macro sources (BLS, IRS)
 - Broader semantic model and cross-source joins
 - Performance tuning for larger backfills
 - Optional catalog/metadata integration and richer lineage reporting

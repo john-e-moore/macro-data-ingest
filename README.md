@@ -53,48 +53,18 @@ Provisioning behavior details and rollback guidance: `docs/setup.md`.
 ## Pipeline Commands
 
 The CLI exposes pipeline commands:
-- `mdi ingest --env staging --run-id <run_id>`
-- `mdi transform --env staging --run-id <run_id>`
-- `mdi load --env staging --run-id <run_id>`
-- `mdi run-all --env staging --run-id <run_id>`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce1`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_regional_price_parities_sarpp`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_real_income_and_pce_sarpi`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp1`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp2`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp3`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp4`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp5`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp6`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp7`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp8`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp9`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sagdp11`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_gdp_sasummary`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id pce_state_sapce4_monthly`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_population`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id state_personal_transfer_receipts_sainc35`
-- `mdi run-all --env staging --run-id <run_id> --dataset-id census_state_gov_finance_federal_intergovernmental_revenue`
+- `mdi ingest --run-id <run_id>`
+- `mdi transform --run-id <run_id>`
+- `mdi load --run-id <run_id>`
+- `mdi run-all --run-id <run_id>`
+- `mdi run-all --run-id <run_id> --dataset-id <dataset_id>`
 
 By default, ingest requests BEA annual years from `BEA_START_YEAR` through current year
 (set in `.env`, default `2000`). `run-all` skips transform/load automatically when the
 ingest payload hash is unchanged.
 
-`run-all` reads `config/datasets.yaml` and processes each enabled dataset. The default config ingests:
-- `pce_state_sapce1` (annual SAPCE1, `bea_frequency: A`)
-- `pce_state_sapce4` (annual SAPCE4, `bea_frequency: A`)
-- `state_regional_price_parities_sarpp` (annual SARPP, `bea_frequency: A`)
-- `state_real_income_and_pce_sarpi` (annual SARPI, `bea_frequency: A`, includes real PI, real PI per capita, real PCE, and real PCE per capita)
-- `state_gdp_sagdp1` through `state_gdp_sagdp9` (annual SAGDP table group, `bea_frequency: A`)
-- `state_gdp_sagdp11` (annual SAGDP table group, `bea_frequency: A`)
-- `state_gdp_sasummary` (annual state GDP summary table, `bea_frequency: A`)
-- `state_personal_transfer_receipts_sainc35` (annual SAINC35 line 2000 transfer receipts to individuals from governments)
-- `census_state_gov_finance_federal_intergovernmental_revenue` (annual Census state government intergovernmental revenue, AGG_DESC `SF0004`)
-
-The repo also includes a staged monthly config entry:
-- `pce_state_sapce4_monthly` (monthly SAPCE4, `bea_frequency: M`, currently disabled by default)
-- `census_state_population` (annual Census population, `census_frequency: A`, `census_start_year: 2000`)
+`run-all` reads `config/datasets.yaml` and processes each enabled dataset.
+Dataset definitions and current enabled coverage are documented in `docs/datasets.md`.
 
 Most annual BEA datasets use `line_code: ALL`, so all function categories for each configured BEA table
 are ingested for the enabled grain; `state_personal_transfer_receipts_sainc35` is intentionally scoped to
@@ -116,6 +86,7 @@ or local runs.
 
 - Setup guide: `docs/setup.md`
 - Architecture: `docs/architecture.md`
+- Dataset catalog: `docs/datasets.md`
 - Functional/non-functional spec: `docs/spec.md`
 - Roadmap: `docs/roadmap.md`
 - Operability runbook: `docs/operability.md`

@@ -62,8 +62,6 @@ STATE_FIPS_TO_ABBR = {
 
 
 def _parse_state_fips(geo_fips: str) -> str:
-    if len(geo_fips) == 5 and geo_fips.endswith("000"):
-        return geo_fips[:2]
     return geo_fips[:2]
 
 

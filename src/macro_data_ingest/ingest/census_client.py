@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
-import time
 from typing import Any
 
 import requests
+
+from macro_data_ingest.ingest.http_utils import JsonHttpClient
 
 
 class CensusClient:
@@ -21,59 +22,25 @@ class CensusClient:
         min_request_interval_seconds: float = 0.25,
     ) -> None:
         self.api_key = api_key
-        self.timeout_seconds = timeout_seconds
-        self.max_retries = max_retries
-        self.retry_backoff_seconds = retry_backoff_seconds
-        self.min_request_interval_seconds = min_request_interval_seconds
-        self._session = requests.Session()
-        self._last_request_monotonic: float | None = None
-
-    def _throttle_if_needed(self) -> None:
-        if self._last_request_monotonic is None:
-            return
-        elapsed = time.monotonic() - self._last_request_monotonic
-        remaining = self.min_request_interval_seconds - elapsed
-        if remaining > 0:
-            time.sleep(remaining)
+        self._http = JsonHttpClient(
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            retry_backoff_seconds=retry_backoff_seconds,
+            min_request_interval_seconds=min_request_interval_seconds,
+        )
 
     def _request(
         self, year: int | None, dataset_path: str, params: dict[str, str]
     ) -> list[list[str]]:
-        last_exception: Exception | None = None
-        retryable_statuses = {429, 500, 502, 503, 504}
         normalized_path = dataset_path.strip("/")
         if year is None:
             url = f"{self.base_url}/{normalized_path}"
         else:
             url = f"{self.base_url}/{year}/{normalized_path}"
-        for attempt in range(self.max_retries + 1):
-            self._throttle_if_needed()
-            self._last_request_monotonic = time.monotonic()
-            try:
-                response = self._session.get(url, params=params, timeout=self.timeout_seconds)
-                response.raise_for_status()
-                if not response.text.strip():
-                    return []
-                payload = response.json()
-                if not isinstance(payload, list):
-                    raise ValueError("Unexpected Census response format: expected list payload.")
-                return payload
-            except requests.HTTPError as exc:
-                last_exception = exc
-                status_code = exc.response.status_code if exc.response is not None else None
-                if status_code not in retryable_statuses or attempt == self.max_retries:
-                    raise
-                wait_seconds = self.retry_backoff_seconds * (2**attempt)
-                time.sleep(wait_seconds)
-            except requests.RequestException as exc:
-                last_exception = exc
-                if attempt == self.max_retries:
-                    raise
-                wait_seconds = self.retry_backoff_seconds * (2**attempt)
-                time.sleep(wait_seconds)
-        if last_exception is not None:
-            raise last_exception
-        raise RuntimeError("Unexpected request retry failure without exception.")
+        payload = self._http.request_json(url=url, params=params)
+        if not isinstance(payload, list):
+            raise ValueError("Unexpected Census response format: expected list payload.")
+        return payload
 
     def fetch_state_population(
         self,

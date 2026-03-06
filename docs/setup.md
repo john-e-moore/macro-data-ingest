@@ -43,10 +43,6 @@ Do not commit real values.
 - `GITHUB_REPO=your-org/macro-data-ingest`
 - `BEA_API_KEY=example`
 - `CENSUS_API_KEY=example`
-- `BEA_DATASET=Regional`
-- `BEA_TABLE_NAME=SAPCE4`
-- `BEA_FREQUENCY=A`
-- `BEA_START_YEAR=2000`
 - `DATASETS_CONFIG_PATH=config/datasets.yaml`
 - `PG_HOST=example.rds.amazonaws.com`
 - `PG_PORT=5432`
@@ -104,21 +100,8 @@ Set repository-level secrets:
 - `S3_PREFIX_ROOT`
 - `SNS_ALERT_TOPIC_ARN` (optional)
 
-Recommended optional secrets (override defaults when needed):
-
-- `BEA_DATASET` (default `Regional`)
-- `BEA_TABLE_NAME` (default `SAPCE4`)
-- `BEA_FREQUENCY` (default `A`)
-- `BEA_START_YEAR` (default `2000`; ingestion requests this year through current year)
-
-`config/datasets.yaml` is the canonical source for daily runs. By default it includes
-annual BEA state tables `SAPCE1`, `SAPCE4`, `SARPP`, `SARPI`, `SAGDP1`-`SAGDP9`,
-`SAGDP11`, and `SASUMMARY` with `line_code: ALL` plus Census annual state population (`dataset_path: acs/acs1`, `variable: B01003_001E`,
-`start_year: 2000`; pre-2005 rows are backfilled from Census intercensal estimates), BEA annual `SAINC35` line `2000`,
-and Census annual state government finance intergovernmental revenue (`dataset_path: timeseries/govs`, `SVY_COMP=02`, `GOVTYPE=002`, `AGG_DESC=SF0004`).
-It also includes a disabled monthly SAPCE4 entry staged for future enablement once BEA
-returns monthly `TimePeriod` rows for the selected table. New series should default to
-`*_start_year: 2000` unless explicitly scoped tighter.
+`config/datasets.yaml` is the canonical source for daily runs.
+Current dataset coverage and semantics are documented in `docs/datasets.md`.
 
 ## Standardized Backfills
 

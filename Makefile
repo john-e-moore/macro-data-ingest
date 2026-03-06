@@ -15,4 +15,4 @@ test:
 	$(PYTHON) -m pytest -q
 
 smoke:
-	mdi run-all --env staging --smoke
+	mdi run-all --smoke
