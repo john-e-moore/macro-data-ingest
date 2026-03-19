@@ -6,8 +6,7 @@ x. Add Census data
 x. Create serving view w/ population-weighted pce by function
 x. Look into how to get federal money received per program per state
 x. Ask AI if data model is coherent; could it be tighter? Do we only need fact_macro_observation at the gold layer?
-4. Ask AI how to simplify code base
-5. Stand up prod database and add staging / prod to CI
+x. Ask AI how to simplify code base
 6. Frontend (New repo) - create simple Next.js frontend for querying and displaying the serving layer
  - Country-level view with states
  - State-level view with counties
@@ -17,3 +16,16 @@ x. Ask AI if data model is coherent; could it be tighter? Do we only need fact_m
  - Add targeted indexes at common filters (source, period, vintage, geo paths)
  - Consider materializing hottest serving objects
  - Consider partitioning fact table by period or source if row count grows a lot
+8. Prod database & add to CI
+9. New data
+ - IRS SOI
+ - Other BEA
+ - BLS - CES payrolls (establishment)
+ - BLS - CPS household
+ - CPI
+ - PPI
+ - More Census
+  - Retail sales (MARTS/MRTS)
+  - Construction spending
+  - Manufacturing / M3 and durable goods
+  - Wholesale / retail inventories and advance economic indicators
