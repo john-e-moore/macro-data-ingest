@@ -57,6 +57,7 @@ Typical objects:
 - `gold.dim_vintage`
 - `gold.fact_macro_observation`
 - `serving.obt_state_macro_annual_latest`
+- `serving.v_state_rpp_pce_weighted_annual`
 - `serving.v_macro_yoy`
 - `serving.v_pce_state_per_capita_annual`
 - `serving.v_state_federal_to_stategov_gdp_annual`
@@ -85,6 +86,7 @@ Dimension responsibilities:
 Use denormalized views for consumer ergonomics and performance:
 
 - `serving.obt_state_macro_annual_latest`: one wide annual row at latest vintage
+- `serving.v_state_rpp_pce_weighted_annual`: annual state RPP rows paired with PCE weights for subset aggregation
 - `serving.v_macro_yoy`: generalized YoY derivation from OBT
 - `serving.v_pce_state_per_capita_annual`: BEA annual values joined to Census population denominator
 - `serving.v_state_federal_to_stategov_gdp_annual`: Census state-government federal receipts intensity versus nominal GDP
