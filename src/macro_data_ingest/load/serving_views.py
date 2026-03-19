@@ -3,6 +3,7 @@ from __future__ import annotations
 
 def build_serving_view_sql(schema_gold: str, schema_serving: str) -> str:
     return f"""
+    DROP VIEW IF EXISTS {schema_serving}.v_state_rpp_pce_weighted_annual;
     DROP VIEW IF EXISTS {schema_serving}.v_pce_state_per_capita_annual;
     DROP VIEW IF EXISTS {schema_serving}.v_state_federal_to_stategov_gdp_annual;
     DROP VIEW IF EXISTS {schema_serving}.v_state_federal_to_persons_gdp_annual;
@@ -44,6 +45,179 @@ def build_serving_view_sql(schema_gold: str, schema_serving: str) -> str:
         ON f.vintage_id = v.vintage_id
     WHERE v.is_latest = TRUE
       AND p.frequency = 'A';
+
+    CREATE VIEW {schema_serving}.v_state_rpp_pce_weighted_annual AS
+    WITH rpp_rows AS (
+        SELECT
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year,
+            line_code AS rpp_line_code,
+            series_code AS rpp_series_code,
+            function_name AS rpp_function_name,
+            pce_value AS rpp,
+            vintage_tag AS rpp_vintage_tag,
+            release_tag AS rpp_release_tag,
+            CASE line_code
+                WHEN '1' THEN 'all_items'
+                WHEN '2' THEN 'goods'
+                WHEN '3' THEN 'housing_rents'
+                WHEN '4' THEN 'utilities'
+                WHEN '5' THEN 'other_services'
+                ELSE NULL
+            END AS category_key,
+            CASE line_code
+                WHEN '1' THEN 'All items'
+                WHEN '2' THEN 'Goods'
+                WHEN '3' THEN 'Housing rents'
+                WHEN '4' THEN 'Utilities'
+                WHEN '5' THEN 'Other services'
+                ELSE function_name
+            END AS category
+        FROM {schema_serving}.obt_state_macro_annual_latest
+        WHERE source_name = 'BEA'
+          AND bea_table_name = 'SARPP'
+    ),
+    pce_weight_rows AS (
+        SELECT
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year,
+            'all_items' AS category_key,
+            'All items' AS category,
+            'direct' AS mapping_method,
+            'SAPCE1' AS pce_source_table,
+            series_code AS pce_series_code,
+            function_name AS pce_function_name,
+            pce_value_scaled AS pce,
+            vintage_tag AS pce_vintage_tag,
+            release_tag AS pce_release_tag
+        FROM {schema_serving}.obt_state_macro_annual_latest
+        WHERE source_name = 'BEA'
+          AND bea_table_name = 'SAPCE1'
+          AND line_code = '1'
+
+        UNION ALL
+
+        SELECT
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year,
+            'goods' AS category_key,
+            'Goods' AS category,
+            'direct' AS mapping_method,
+            'SAPCE1' AS pce_source_table,
+            series_code AS pce_series_code,
+            function_name AS pce_function_name,
+            pce_value_scaled AS pce,
+            vintage_tag AS pce_vintage_tag,
+            release_tag AS pce_release_tag
+        FROM {schema_serving}.obt_state_macro_annual_latest
+        WHERE source_name = 'BEA'
+          AND bea_table_name = 'SAPCE1'
+          AND line_code = '2'
+
+        UNION ALL
+
+        SELECT
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year,
+            'housing_rents' AS category_key,
+            'Housing rents' AS category,
+            'approximation_housing_proxy_for_rents' AS mapping_method,
+            'SAPCE4' AS pce_source_table,
+            series_code AS pce_series_code,
+            function_name AS pce_function_name,
+            pce_value_scaled AS pce,
+            vintage_tag AS pce_vintage_tag,
+            release_tag AS pce_release_tag
+        FROM {schema_serving}.obt_state_macro_annual_latest
+        WHERE source_name = 'BEA'
+          AND bea_table_name = 'SAPCE4'
+          AND line_code = '19'
+
+        UNION ALL
+
+        SELECT
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year,
+            'utilities' AS category_key,
+            'Utilities' AS category,
+            'direct' AS mapping_method,
+            'SAPCE4' AS pce_source_table,
+            series_code AS pce_series_code,
+            function_name AS pce_function_name,
+            pce_value_scaled AS pce,
+            vintage_tag AS pce_vintage_tag,
+            release_tag AS pce_release_tag
+        FROM {schema_serving}.obt_state_macro_annual_latest
+        WHERE source_name = 'BEA'
+          AND bea_table_name = 'SAPCE4'
+          AND line_code = '24'
+
+        UNION ALL
+
+        SELECT
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year,
+            'other_services' AS category_key,
+            'Other services' AS category,
+            'derived_services_less_housing_and_utilities' AS mapping_method,
+            'SAPCE1' AS pce_source_table,
+            'SAPCE1-13_MINUS_15' AS pce_series_code,
+            'Services less housing and utilities' AS pce_function_name,
+            MAX(CASE WHEN line_code = '13' THEN pce_value_scaled END)
+                - MAX(CASE WHEN line_code = '15' THEN pce_value_scaled END) AS pce,
+            MAX(vintage_tag) AS pce_vintage_tag,
+            MAX(release_tag) AS pce_release_tag
+        FROM {schema_serving}.obt_state_macro_annual_latest
+        WHERE source_name = 'BEA'
+          AND bea_table_name = 'SAPCE1'
+          AND line_code IN ('13', '15')
+        GROUP BY
+            state_fips,
+            state_abbrev,
+            geo_name,
+            year
+    )
+    SELECT
+        r.year,
+        r.state_fips,
+        r.state_abbrev,
+        r.geo_name,
+        r.category,
+        r.rpp_line_code,
+        r.rpp_series_code,
+        r.rpp_function_name,
+        r.rpp,
+        p.pce_source_table,
+        p.pce_series_code,
+        p.pce_function_name,
+        p.mapping_method,
+        p.pce,
+        CASE
+            WHEN r.rpp IS NULL OR p.pce IS NULL THEN NULL
+            ELSE r.rpp * p.pce
+        END AS weighted_rpp,
+        r.rpp_vintage_tag,
+        r.rpp_release_tag,
+        p.pce_vintage_tag,
+        p.pce_release_tag
+    FROM rpp_rows r
+    JOIN pce_weight_rows p
+        ON r.state_fips = p.state_fips
+       AND r.year = p.year
+       AND r.category_key = p.category_key
+    WHERE r.category_key IS NOT NULL;
 
     CREATE VIEW {schema_serving}.v_macro_yoy AS
     SELECT
