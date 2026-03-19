@@ -103,11 +103,13 @@ Postgres uses a hybrid model:
   - `serving.v_state_federal_to_persons_gdp_annual`
 - Weighted regional-price view is available in:
   - `serving.v_state_rpp_pce_weighted_annual`
-  - Use `SUM(weighted_rpp) / SUM(pce)` to compute a category price level for any subset of states.
+  - `pce_share` is each state's share of national category PCE.
+  - `weighted_rpp` is `rpp * pce_share`.
+  - Use `SUM(weighted_rpp)` for the national weighted price level, or `SUM(weighted_rpp) / NULLIF(SUM(pce_share), 0)` to renormalize over a subset of states.
 
 Interpretation note:
 - `v_state_federal_to_persons_gdp_annual` uses BEA `SAINC35` line `2000` (transfer receipts of individuals from governments), which can include non-federal government components.
-- `v_state_rpp_pce_weighted_annual` uses an explicit PCE crosswalk: `SAPCE1` for `All items` and `Goods`, `SAPCE4` housing and household-utilities lines for `Housing rents` and `Utilities`, and `SAPCE1 Services - Housing and utilities` for `Other services`.
+- `v_state_rpp_pce_weighted_annual` uses an explicit PCE crosswalk: `SAPCE1` for `All items` and `Goods`, `SAPCE4` housing and household-utilities lines for `Housing rents` and `Utilities`, and `SAPCE1 Services - Housing and utilities` for `Other services`; it also exposes each state's category `pce_share` and the corresponding `weighted_rpp` contribution.
 
 ## Security Notes
 
