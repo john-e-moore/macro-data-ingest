@@ -79,7 +79,7 @@ def build_serving_view_sql(schema_gold: str, schema_serving: str) -> str:
         WHERE source_name = 'BEA'
           AND bea_table_name = 'SARPP'
     ),
-    pce_weight_rows AS (
+    pce_rows AS (
         SELECT
             state_fips,
             state_abbrev,
@@ -188,36 +188,74 @@ def build_serving_view_sql(schema_gold: str, schema_serving: str) -> str:
             state_abbrev,
             geo_name,
             year
+    ),
+    national_pce_totals AS (
+        SELECT
+            year,
+            category_key,
+            SUM(pce) AS national_pce
+        FROM pce_rows
+        GROUP BY year, category_key
+    ),
+    weighted_rows AS (
+        SELECT
+            r.year,
+            r.state_fips,
+            r.state_abbrev,
+            r.geo_name,
+            r.category,
+            r.rpp_line_code,
+            r.rpp_series_code,
+            r.rpp_function_name,
+            r.rpp,
+            p.pce_source_table,
+            p.pce_series_code,
+            p.pce_function_name,
+            p.mapping_method,
+            p.pce,
+            CASE
+                WHEN p.pce IS NULL THEN NULL
+                ELSE p.pce / NULLIF(t.national_pce, 0)
+            END AS pce_share,
+            r.rpp_vintage_tag,
+            r.rpp_release_tag,
+            p.pce_vintage_tag,
+            p.pce_release_tag
+        FROM rpp_rows r
+        JOIN pce_rows p
+            ON r.state_fips = p.state_fips
+           AND r.year = p.year
+           AND r.category_key = p.category_key
+        JOIN national_pce_totals t
+            ON p.year = t.year
+           AND p.category_key = t.category_key
+        WHERE r.category_key IS NOT NULL
     )
     SELECT
-        r.year,
-        r.state_fips,
-        r.state_abbrev,
-        r.geo_name,
-        r.category,
-        r.rpp_line_code,
-        r.rpp_series_code,
-        r.rpp_function_name,
-        r.rpp,
-        p.pce_source_table,
-        p.pce_series_code,
-        p.pce_function_name,
-        p.mapping_method,
-        p.pce,
+        year,
+        state_fips,
+        state_abbrev,
+        geo_name,
+        category,
+        rpp_line_code,
+        rpp_series_code,
+        rpp_function_name,
+        rpp,
+        pce_source_table,
+        pce_series_code,
+        pce_function_name,
+        mapping_method,
+        pce,
+        pce_share,
         CASE
-            WHEN r.rpp IS NULL OR p.pce IS NULL THEN NULL
-            ELSE r.rpp * p.pce
+            WHEN rpp IS NULL OR pce_share IS NULL THEN NULL
+            ELSE rpp * pce_share
         END AS weighted_rpp,
-        r.rpp_vintage_tag,
-        r.rpp_release_tag,
-        p.pce_vintage_tag,
-        p.pce_release_tag
-    FROM rpp_rows r
-    JOIN pce_weight_rows p
-        ON r.state_fips = p.state_fips
-       AND r.year = p.year
-       AND r.category_key = p.category_key
-    WHERE r.category_key IS NOT NULL;
+        rpp_vintage_tag,
+        rpp_release_tag,
+        pce_vintage_tag,
+        pce_release_tag
+    FROM weighted_rows;
 
     CREATE VIEW {schema_serving}.v_macro_yoy AS
     SELECT
